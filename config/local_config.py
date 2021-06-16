@@ -1,0 +1,12 @@
+#!/usr/bin/python
+# -*- coding: UTF-8 -*-
+
+MYSQL_HOST = "127.0.0.1"
+MYSQL_PORT = 33096
+MYSQL_USER = ""
+MYSQL_PASS = ""
+MYSQL_DB = "crontab"
+
+SOCKET_HOST = '127.0.0.1'
+SOCKET_PORT = 21110
+SOCKET_BUFFER = 8192
