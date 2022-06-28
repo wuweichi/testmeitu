@@ -1,9 +1,5 @@
 <?php
-/**
- * Created by PhpStorm.
- * Date: 16-7-8
- * Time: 上午9:15
- */
+
 $this->title = '任务列表';
 use yii\widgets\LinkPager;
 
