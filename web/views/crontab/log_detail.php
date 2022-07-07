@@ -1,9 +1,4 @@
 <?php
-/**
- * Created by PhpStorm.
- * Date: 16-7-8
- * Time: 下午2:37
- */
 
 $this->title = '日志';
 ?>

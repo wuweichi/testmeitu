@@ -1,9 +1,4 @@
 <?php
-/**
- * Created by PhpStorm.
- * Date: 16-7-8
- * Time: 上午9:15
- */
 
 $this->title = '日志';
 use yii\widgets\LinkPager;
