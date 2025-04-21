@@ -6,35 +6,48 @@ import (
 	"time"
 )
 
-// Define a struct for a person
-type Person struct {
-	Name string
-	Age  int
+// ComplexStruct represents a complex data structure
+type ComplexStruct struct {
+	ID      int
+	Name    string
+	Details []Detail
 }
 
-// Function to generate a random person
-func generateRandomPerson() Person {
-	names := []string{"Alice", "Bob", "Charlie", "Diana", "Eve", "Frank", "Grace", "Hank"}
-	return Person{
-		Name: names[rand.Intn(len(names))],
-		Age:  rand.Intn(100) + 1,
-	}
+// Detail represents additional details
+type Detail struct {
+	Key   string
+	Value string
 }
 
-// Function to print a person's details
-func printPerson(p Person) {
-	fmt.Printf("Name: %s, Age: %d\n", p.Name, p.Age)
-}
-
-// Main function
-func main() {
+func generateRandomComplexStruct() ComplexStruct {
 	rand.Seed(time.Now().UnixNano())
-	
-	// Generate and print 1000 random people
-	for i := 0; i < 1000; i++ {
-		person := generateRandomPerson()
-		printPerson(person)
+	details := make([]Detail, rand.Intn(5)+1)
+	for i := range details {
+		details[i] = Detail{
+			Key:   fmt.Sprintf("Key%d", i),
+			Value: fmt.Sprintf("Value%d", rand.Intn(100)),
+		}
 	}
-	
-	fmt.Println("Generated 1000 random people!")
+	return ComplexStruct{
+		ID:      rand.Intn(1000),
+		Name:    fmt.Sprintf("Name%d", rand.Intn(100)),
+		Details: details,
+	}
+}
+
+func printComplexStruct(cs ComplexStruct) {
+	fmt.Printf("ID: %d\n", cs.ID)
+	fmt.Printf("Name: %s\n", cs.Name)
+	fmt.Println("Details:")
+	for _, detail := range cs.Details {
+		fmt.Printf("\t%s: %s\n", detail.Key, detail.Value)
+	}
+}
+
+func main() {
+	for i := 0; i < 100; i++ {
+		cs := generateRandomComplexStruct()
+		printComplexStruct(cs)
+		fmt.Println("-----------------")
+	}
 }
