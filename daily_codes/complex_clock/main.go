@@ -9,53 +9,64 @@ import (
 	"syscall"
 )
 
+// Clock represents a clock with hours, minutes, and seconds.
 type Clock struct {
-	hour, minute, second int
+	hours, minutes, seconds int
 }
 
-func (c *Clock) Update() {
-	now := time.Now()
-	c.hour = now.Hour()
-	c.minute = now.Minute()
-	c.second = now.Second()
+// NewClock creates a new Clock instance.
+func NewClock(h, m, s int) *Clock {
+	return &Clock{hours: h, minutes: m, seconds: s}
 }
 
-func (c Clock) Display() {
-	fmt.Printf("\r%02d:%02d:%02d", c.hour, c.minute, c.second)
+// Display shows the current time of the clock.
+func (c *Clock) Display() {
+	fmt.Printf("%02d:%02d:%02d\n", c.hours, c.minutes, c.seconds)
 }
 
-func generateRandomColor() string {
-	colors := []string{
-		"\033[31m", // Red
-		"\033[32m", // Green
-		"\033[33m", // Yellow
-		"\033[34m", // Blue
-		"\033[35m", // Magenta
-		"\033[36m", // Cyan
+// Tick advances the clock by one second.
+func (c *Clock) Tick() {
+	c.seconds++
+	if c.seconds >= 60 {
+		c.seconds = 0
+		c.minutes++
+		if c.minutes >= 60 {
+			c.minutes = 0
+			c.hours++
+			if c.hours >= 24 {
+				c.hours = 0
+			}
+		}
 	}
-	return colors[rand.Intn(len(colors))]
+}
+
+// RandomClock generates a new Clock with random time.
+func RandomClock() *Clock {
+	rand.Seed(time.Now().UnixNano())
+	return NewClock(rand.Intn(24), rand.Intn(60), rand.Intn(60)
 }
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
-	clock := Clock{}
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
-
-	fmt.Println("Press Ctrl+C to stop the clock")
-	fmt.Println("The clock will change color every second:")
-
-	for {
-		select {
-		case <-stop:
-			fmt.Println("\nClock stopped.")
-			return
-		default:
-			clock.Update()
-			color := generateRandomColor()
-			fmt.Print(color)
-			clock.Display()
-			time.Sleep(1 * time.Second)
+	// Create a random clock
+	clock := RandomClock()
+	// Setup signal handling for graceful shutdown
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	done := make(chan bool, 1)
+	// Start a goroutine to handle the clock ticking
+	go func() {
+		for {
+			select {
+			case <-time.After(1 * time.Second):
+				clock.Tick()
+				clock.Display()
+			case <-done:
+				return
+			}
 		}
-	}
+	}()
+	// Wait for shutdown signal
+	<-sigs
+	done <- true
+	fmt.Println("Clock stopped.")
 }
