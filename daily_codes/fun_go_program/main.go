@@ -7,12 +7,18 @@ import (
 )
 
 func main() {
+	fmt.Println("Welcome to the Fun Go Program!")
+	fmt.Println("Let's play a guessing game!")
+
+	// Seed the random number generator
 	rand.Seed(time.Now().UnixNano())
 	secretNumber := rand.Intn(100) + 1
-	fmt.Println("I've chosen a random number between 1 and 100. Can you guess it?")
+
+	fmt.Println("I've picked a number between 1 and 100. Can you guess it?")
 
 	var guess int
 	attempts := 0
+
 	for {
 		fmt.Print("Enter your guess: ")
 		_, err := fmt.Scanf("%d", &guess)
@@ -31,4 +37,6 @@ func main() {
 			break
 		}
 	}
+
+	fmt.Println("Thanks for playing! Goodbye!")
 }
