@@ -7,13 +7,15 @@ import (
 )
 
 func generateRandomNumber(min, max int) int {
-	return rand.Intn(max-min) + min
+	rand.Seed(time.Now().UnixNano())
+	return rand.Intn(max-min+1) + min
 }
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
+	fmt.Println("Starting the complex program...")
 	for i := 0; i < 1000; i++ {
 		randomNum := generateRandomNumber(1, 100)
-		fmt.Printf("Random number %d: %d\n", i+1, randomNum)
+		fmt.Printf("Iteration %d: Random number is %d\n", i+1, randomNum)
 	}
+	fmt.Println("Program completed successfully.")
 }
