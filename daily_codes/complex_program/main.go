@@ -6,16 +6,29 @@ import (
 	"time"
 )
 
-func generateRandomNumber(min, max int) int {
+func generateRandomNumbers(count int) []int {
 	rand.Seed(time.Now().UnixNano())
-	return rand.Intn(max-min+1) + min
+	numbers := make([]int, count)
+	for i := 0; i < count; i++ {
+		numbers[i] = rand.Intn(100)
+	}
+	return numbers
+}
+
+func bubbleSort(numbers []int) []int {
+	n := len(numbers)
+	for i := 0; i < n-1; i++ {
+		for j := 0; j < n-i-1; j++ {
+			if numbers[j] > numbers[j+1] {
+				numbers[j], numbers[j+1] = numbers[j+1], numbers[j]
+			}
+		}
+	}
+	return numbers
 }
 
 func main() {
-	fmt.Println("Starting the complex program...")
-	for i := 0; i < 1000; i++ {
-		randomNum := generateRandomNumber(1, 100)
-		fmt.Printf("Iteration %d: Random number is %d\n", i+1, randomNum)
-	}
-	fmt.Println("Program completed successfully.")
+	numbers := generateRandomNumbers(1000)
+	sortedNumbers := bubbleSort(numbers)
+	fmt.Println("Sorted Numbers:", sortedNumbers)
 }
