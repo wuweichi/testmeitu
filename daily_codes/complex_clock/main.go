@@ -9,64 +9,34 @@ import (
 	"syscall"
 )
 
-// Clock represents a clock with hours, minutes, and seconds.
-type Clock struct {
-	hours, minutes, seconds int
-}
-
-// NewClock creates a new Clock instance.
-func NewClock(h, m, s int) *Clock {
-	return &Clock{hours: h, minutes: m, seconds: s}
-}
-
-// Display shows the current time of the clock.
-func (c *Clock) Display() {
-	fmt.Printf("%02d:%02d:%02d\n", c.hours, c.minutes, c.seconds)
-}
-
-// Tick advances the clock by one second.
-func (c *Clock) Tick() {
-	c.seconds++
-	if c.seconds >= 60 {
-		c.seconds = 0
-		c.minutes++
-		if c.minutes >= 60 {
-			c.minutes = 0
-			c.hours++
-			if c.hours >= 24 {
-				c.hours = 0
-			}
-		}
-	}
-}
-
-// RandomClock generates a new Clock with random time.
-func RandomClock() *Clock {
-	rand.Seed(time.Now().UnixNano())
-	return NewClock(rand.Intn(24), rand.Intn(60), rand.Intn(60)
-}
-
 func main() {
-	// Create a random clock
-	clock := RandomClock()
-	// Setup signal handling for graceful shutdown
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	done := make(chan bool, 1)
-	// Start a goroutine to handle the clock ticking
+	// Seed the random number generator
+	rand.Seed(time.Now().UnixNano())
+
+	// Create a channel to listen for interrupt signals
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
+
+	// Start the clock
 	go func() {
 		for {
-			select {
-			case <-time.After(1 * time.Second):
-				clock.Tick()
-				clock.Display()
-			case <-done:
-				return
-			}
+			// Generate a random color for the clock
+			color := fmt.Sprintf("\033[38;5;%dm", rand.Intn(256))
+			reset := "\033[0m"
+
+			// Get the current time
+			now := time.Now()
+			hour, min, sec := now.Hour(), now.Minute(), now.Second()
+
+			// Print the time with the random color
+			fmt.Printf("%s%02d:%02d:%02d%s\r", color, hour, min, sec, reset)
+
+			// Wait for one second
+			time.Sleep(1 * time.Second)
 		}
 	}()
-	// Wait for shutdown signal
-	<-sigs
-	done <- true
-	fmt.Println("Clock stopped.")
+
+	// Wait for an interrupt signal
+	<-interrupt
+	fmt.Println("\nClock stopped.")
 }
