@@ -6,19 +6,14 @@ import (
 	"time"
 )
 
-func generateRandomString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	seededRand := rand.New(rand.NewSource(time.Now().UnixNano()))
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[seededRand.Intn(len(charset))]
-	}
-	return string(b)
+func generateRandomNumber(min, max int) int {
+	return rand.Intn(max-min) + min
 }
 
 func main() {
+	rand.Seed(time.Now().UnixNano())
 	for i := 0; i < 1000; i++ {
-		randomString := generateRandomString(10)
-		fmt.Printf("Random string %d: %s\n", i+1, randomString)
+		randomNumber := generateRandomNumber(1, 100)
+		fmt.Printf("Random number %d: %d\n", i+1, randomNumber)
 	}
 }
