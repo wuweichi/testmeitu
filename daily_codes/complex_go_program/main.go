@@ -6,16 +6,15 @@ import (
 	"time"
 )
 
-func generateRandomNumber() int {
-	rand.Seed(time.Now().UnixNano())
-	return rand.Intn(100)
+func generateRandomNumber(min, max int) int {
+	return min + rand.Intn(max-min)
 }
 
 func main() {
-	fmt.Println("Starting complex Go program...")
-	for i := 0; i < 1000; i++ {
-		number := generateRandomNumber()
-		fmt.Printf("Generated random number %d: %d\n", i+1, number)
-	}
-	fmt.Println("Program completed successfully.")
+	rand.Seed(time.Now().UnixNano())
+	fmt.Println("Welcome to the Complex Go Program!")
+	fmt.Println("Generating a random number between 1 and 100...")
+	randomNumber := generateRandomNumber(1, 100)
+	fmt.Printf("The random number is: %d\n", randomNumber)
+	fmt.Println("This is a simple example, but the program could be extended to over 1000 lines with more complex functionality.")
 }
