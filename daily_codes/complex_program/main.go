@@ -6,16 +6,16 @@ import (
 	"time"
 )
 
-func generateRandomNumber() int {
+func generateRandomNumber(min, max int) int {
 	rand.Seed(time.Now().UnixNano())
-	return rand.Intn(100)
+	return rand.Intn(max-min+1) + min
 }
 
 func main() {
-	fmt.Println("Starting the complex program...")
+	fmt.Println("Welcome to the Complex Number Generator!")
 	for i := 0; i < 1000; i++ {
-		randomNum := generateRandomNumber()
-		fmt.Printf("Iteration %d: Random number is %d\n", i, randomNum)
+		randomNum := generateRandomNumber(1, 1000)
+		fmt.Printf("Generated random number %d: %d\n", i+1, randomNum)
 	}
-	fmt.Println("Program completed successfully.")
+	fmt.Println("Finished generating numbers!")
 }
