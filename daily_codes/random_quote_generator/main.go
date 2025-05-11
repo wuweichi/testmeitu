@@ -6,27 +6,20 @@ import (
 	"time"
 )
 
-type Quote struct {
-	Text   string
-	Author string
+var quotes = []string{
+	"The only limit to our realization of tomorrow is our doubts of today. - Franklin D. Roosevelt",
+	"Life is what happens when you're busy making other plans. - John Lennon",
+	"You must be the change you wish to see in the world. - Mahatma Gandhi",
+	"In the end, it's not the years in your life that count. It's the life in your years. - Abraham Lincoln",
+	"Do not go where the path may lead, go instead where there is no path and leave a trail. - Ralph Waldo Emerson",
+	"The future belongs to those who believe in the beauty of their dreams. - Eleanor Roosevelt",
+	"To live is the rarest thing in the world. Most people exist, that is all. - Oscar Wilde",
+	"That which does not kill us makes us stronger. - Friedrich Nietzsche",
+	"It is never too late to be what you might have been. - George Eliot",
+	"Strive not to be a success, but rather to be of value. - Albert Einstein",
 }
 
 func main() {
-	quotes := []Quote{
-		{"The only limit to our realization of tomorrow is our doubts of today.", "Franklin D. Roosevelt"},
-		{"Do not watch the clock. Do what it does. Keep going.", "Sam Levenson"},
-		{"The way to get started is to quit talking and begin doing.", "Walt Disney"},
-		{"Life is what happens when you're busy making other plans.", "John Lennon"},
-		{"The future belongs to those who believe in the beauty of their dreams.", "Eleanor Roosevelt"},
-		{"You must be the change you wish to see in the world.", "Mahatma Gandhi"},
-		{"Spread love everywhere you go. Let no one ever come to you without leaving happier.", "Mother Teresa"},
-		{"The only thing we have to fear is fear itself.", "Franklin D. Roosevelt"},
-		{"It is during our darkest moments that we must focus to see the light.", "Aristotle"},
-		{"Whoever is happy will make others happy too.", "Anne Frank"},
-	}
-
 	rand.Seed(time.Now().UnixNano())
-	randomQuote := quotes[rand.Intn(len(quotes))]
-
-	fmt.Printf("\"%s\" - %s\n", randomQuote.Text, randomQuote.Author)
+	fmt.Println(quotes[rand.Intn(len(quotes))])
 }
