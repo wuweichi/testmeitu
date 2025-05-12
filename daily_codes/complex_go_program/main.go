@@ -6,18 +6,19 @@ import (
 	"time"
 )
 
-func generateRandomNumber() int {
-	return rand.Intn(100)
+func generateRandomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	var seededRand *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[seededRand.Intn(len(charset))]
+	}
+	return string(b)
 }
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
-	fmt.Println("Generating a complex Go program with more than 1000 lines...")
-	// Imagine here are more than 1000 lines of complex Go code
-	// For the sake of brevity, we'll simulate the essence
 	for i := 0; i < 1000; i++ {
-		number := generateRandomNumber()
-		fmt.Printf("Iteration %d: Random number is %d\n", i+1, number)
+		randomString := generateRandomString(10)
+		fmt.Printf("Random string %d: %s\n", i+1, randomString)
 	}
-	fmt.Println("Program completed successfully!")
 }
