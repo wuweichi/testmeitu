@@ -18,25 +18,22 @@ func main() {
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
 
 	// Start the clock
-	go func() {
-		for {
-			// Generate a random color for the clock
-			color := fmt.Sprintf("\033[38;5;%dm", rand.Intn(256))
-			reset := "\033[0m"
+	fmt.Println("Starting the complex clock...")
+	clock := time.NewTicker(1 * time.Second)
+	defer clock.Stop()
 
-			// Get the current time
-			now := time.Now()
-			hour, min, sec := now.Hour(), now.Minute(), now.Second()
-
-			// Print the time with the random color
-			fmt.Printf("%s%02d:%02d:%02d%s\r", color, hour, min, sec, reset)
-
-			// Wait for one second
-			time.Sleep(1 * time.Second)
+	// Run the clock
+	for {
+		select {
+		case <-clock.C:
+			hour, min, sec := time.Now().Clock()
+			fmt.Printf("Current time: %02d:%02d:%02d\n", hour, min, sec)
+			// Generate a random number and print it
+			randomNum := rand.Intn(100)
+			fmt.Printf("Random number: %d\n", randomNum)
+		case <-interrupt:
+			fmt.Println("\nReceived interrupt signal. Stopping the clock...")
+			return
 		}
-	}()
-
-	// Wait for an interrupt signal
-	<-interrupt
-	fmt.Println("\nClock stopped.")
+	}
 }
