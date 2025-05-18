@@ -7,54 +7,81 @@ import (
 	"time"
 )
 
-func generateRandomNumbers(count int) []float64 {
-	rand.Seed(time.Now().UnixNano())
-	numbers := make([]float64, count)
-	for i := 0; i < count; i++ {
-		numbers[i] = rand.Float64() * 100
-	}
-	return numbers
-}
-
-func calculateMean(numbers []float64) float64 {
-	sum := 0.0
-	for _, num := range numbers {
-		sum += num
-	}
-	return sum / float64(len(numbers))
-}
-
-func calculateStandardDeviation(numbers []float64, mean float64) float64 {
-	sum := 0.0
-	for _, num := range numbers {
-		sum += math.Pow(num-mean, 2)
-	}
-	variance := sum / float64(len(numbers))
-	return math.Sqrt(variance)
-}
-
 func main() {
-	numbers := generateRandomNumbers(1000)
-	mean := calculateMean(numbers)
-	stdDev := calculateStandardDeviation(numbers, mean)
+	// Seed the random number generator
+	rand.Seed(time.Now().UnixNano())
 
-	fmt.Printf("Generated %d random numbers\n", len(numbers))
-	fmt.Printf("Mean: %.2f\n", mean)
-	fmt.Printf("Standard Deviation: %.2f\n", stdDev)
+	// Generate two random numbers
+	a := rand.Intn(100)
+	b := rand.Intn(100)
 
-	// Additional calculations to increase the program length
-	for i := 0; i < 100; i++ {
-		dummy := math.Sin(float64(i)) * math.Cos(float64(i))
-		_ = dummy // Prevent unused variable error
+	// Perform and print various calculations
+	fmt.Printf("Generated numbers: %d and %d\n", a, b)
+	fmt.Printf("Addition: %d + %d = %d\n", a, b, a+b)
+	fmt.Printf("Subtraction: %d - %d = %d\n", a, b, a-b)
+	fmt.Printf("Multiplication: %d * %d = %d\n", a, b, a*b)
+	if b != 0 {
+		fmt.Printf("Division: %d / %d = %.2f\n", a, b, float64(a)/float64(b))
+	} else {
+		fmt.Println("Division by zero is undefined")
+	}
+	fmt.Printf("Square root of %d: %.2f\n", a, math.Sqrt(float64(a)))
+	fmt.Printf("Square root of %d: %.2f\n", b, math.Sqrt(float64(b)))
+	fmt.Printf("%d to the power of %d: %.2f\n", a, b, math.Pow(float64(a), float64(b)))
+
+	// A loop to print a multiplication table for a
+	fmt.Println("Multiplication table for the first generated number:")
+	for i := 1; i <= 10; i++ {
+		fmt.Printf("%d x %d = %d\n", a, i, a*i)
 	}
 
-	// More complex operations
-	for i := 0; i < len(numbers); i++ {
-		for j := 0; j < 10; j++ {
-			numbers[i] = math.Sqrt(numbers[i]) + float64(j)
+	// Generate a slice of random numbers and find the max and min
+	numbers := make([]int, 10)
+	for i := range numbers {
+		numbers[i] = rand.Intn(1000)
+	}
+	max, min := numbers[0], numbers[0]
+	for _, num := range numbers {
+		if num > max {
+			max = num
+		}
+		if num < min {
+			min = num
 		}
 	}
+	fmt.Printf("Generated numbers: %v\n", numbers)
+	fmt.Printf("Max: %d, Min: %d\n", max, min)
 
-	// Final output
-	fmt.Println("Program completed successfully.")
+	// Calculate factorial of a
+	factorial := 1
+	for i := 1; i <= a; i++ {
+		factorial *= i
+	}
+	fmt.Printf("Factorial of %d: %d\n", a, factorial)
+
+	// Check if numbers are prime
+	isPrime := func(n int) bool {
+		if n <= 1 {
+			return false
+		}
+		for i := 2; i <= int(math.Sqrt(float64(n))); i++ {
+			if n%i == 0 {
+				return false
+			}
+		}
+		return true
+	}
+	fmt.Printf("Is %d prime? %t\n", a, isPrime(a))
+	fmt.Printf("Is %d prime? %t\n", b, isPrime(b))
+
+	// Generate Fibonacci sequence up to n terms
+	n := 10
+	fib := make([]int, n)
+	fib[0], fib[1] = 1, 1
+	for i := 2; i < n; i++ {
+		fib[i] = fib[i-1] + fib[i-2]
+	}
+	fmt.Printf("First %d terms of Fibonacci sequence: %v\n", n, fib)
+
+	// More complex calculations and operations can be added here to extend the program
 }
