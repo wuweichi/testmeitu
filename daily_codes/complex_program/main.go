@@ -19,6 +19,6 @@ func generateRandomString(length int) string {
 func main() {
 	for i := 0; i < 1000; i++ {
 		randomString := generateRandomString(10)
-		fmt.Printf("Random String %d: %s\n", i+1, randomString)
+		fmt.Printf("Random string %d: %s\n", i+1, randomString)
 	}
 }
