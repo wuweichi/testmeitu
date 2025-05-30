@@ -13,7 +13,7 @@ func generateRandomNumber(min, max int) int {
 func main() {
 	rand.Seed(time.Now().UnixNano())
 	for i := 0; i < 1000; i++ {
-		randomNumber := generateRandomNumber(1, 100)
-		fmt.Printf("Random number %d: %d\n", i+1, randomNumber)
+		number := generateRandomNumber(1, 100)
+		fmt.Printf("Random number %d: %d\n", i+1, number)
 	}
 }
