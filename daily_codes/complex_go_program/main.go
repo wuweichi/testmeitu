@@ -12,10 +12,14 @@ func generateRandomNumber() int {
 }
 
 func main() {
-	fmt.Println("Starting the complex Go program...")
+	fmt.Println("Welcome to the Complex Go Program!")
+	fmt.Println("Generating a random number between 0 and 99...")
+	randomNumber := generateRandomNumber()
+	fmt.Printf("Your random number is: %d\n", randomNumber)
+	
 	for i := 0; i < 1000; i++ {
-		randomNumber := generateRandomNumber()
-		fmt.Printf("Iteration %d: Random number is %d\n", i, randomNumber)
+		fmt.Printf("Loop iteration %d: Still running...\n", i)
 	}
-	fmt.Println("Program completed successfully.")
+	
+	fmt.Println("Program completed successfully!")
 }
