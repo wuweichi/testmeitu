@@ -23,25 +23,41 @@ type Game struct {
 	Food     Point
 	Score    int
 	GameOver bool
+	Width    int
+	Height   int
 }
 
 func (g *Game) Init() {
+	g.Width = 20
+	g.Height = 20
 	g.Snake = Snake{
-		Body:  []Point{{X: 10, Y: 10}},
-		Dir:   Point{X: 1, Y: 0},
+		Body:  []Point{{X: g.Width / 2, Y: g.Height / 2}},
+		Dir:   Point{X: 0, Y: 1},
 		Speed: 1,
 	}
-	g.SpawnFood()
 	g.Score = 0
 	g.GameOver = false
+	g.placeFood()
 }
 
-func (g *Game) SpawnFood() {
-	rand.Seed(time.Now().UnixNano())
-	g.Food = Point{
-		X: rand.Intn(20),
-		Y: rand.Intn(20),
+func (g *Game) placeFood() {
+	for {
+		x := rand.Intn(g.Width)
+		y := rand.Intn(g.Height)
+		g.Food = Point{X: x, Y: y}
+		if !g.isPointOnSnake(g.Food) {
+			break
+		}
 	}
+}
+
+func (g *Game) isPointOnSnake(p Point) bool {
+	for _, b := range g.Snake.Body {
+		if b == p {
+			return true
+		}
+	}
+	return false
 }
 
 func (g *Game) Update() {
@@ -52,24 +68,16 @@ func (g *Game) Update() {
 	head := g.Snake.Body[0]
 	newHead := Point{X: head.X + g.Snake.Dir.X, Y: head.Y + g.Snake.Dir.Y}
 
-	if newHead.X < 0 || newHead.X >= 20 || newHead.Y < 0 || newHead.Y >= 20 {
+	if newHead.X < 0 || newHead.X >= g.Width || newHead.Y < 0 || newHead.Y >= g.Height || g.isPointOnSnake(newHead) {
 		g.GameOver = true
 		return
 	}
 
-	for _, b := range g.Snake.Body {
-		if b == newHead {
-			g.GameOver = true
-			return
-		}
-	}
-
 	g.Snake.Body = append([]Point{newHead}, g.Snake.Body...)
-
 
 	if newHead == g.Food {
 		g.Score++
-		g.SpawnFood()
+		g.placeFood()
 	} else {
 		g.Snake.Body = g.Snake.Body[:len(g.Snake.Body)-1]
 	}
@@ -80,23 +88,15 @@ func (g *Game) Draw() {
 	cmd.Stdout = os.Stdout
 	cmd.Run()
 
-	for y := 0; y < 20; y++ {
-		for x := 0; x < 20; x++ {
+	for y := 0; y < g.Height; y++ {
+		for x := 0; x < g.Width; x++ {
 			p := Point{X: x, Y: y}
-			if p == g.Food {
-				fmt.Print("F")
+			if g.isPointOnSnake(p) {
+				fmt.Print("O")
+			} else if p == g.Food {
+				fmt.Print("*")
 			} else {
-				isBody := false
-				for _, b := range g.Snake.Body {
-					if b == p {
-						fmt.Print("O")
-						isBody = true
-						break
-					}
-				}
-				if !isBody {
-					fmt.Print(".")
-				}
+				fmt.Print(" ")
 			}
 		}
 		fmt.Println()
@@ -105,7 +105,8 @@ func (g *Game) Draw() {
 }
 
 func main() {
-	var game Game
+	rand.Seed(time.Now().UnixNano())
+	game := Game{}
 	game.Init()
 
 	for !game.GameOver {
