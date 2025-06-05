@@ -15,7 +15,7 @@ type Point struct {
 type Snake struct {
 	Body  []Point
 	Dir   Point
-	Speed int
+	Speed time.Duration
 }
 
 type Game struct {
@@ -31,33 +31,31 @@ func (g *Game) Init() {
 	g.Width = 20
 	g.Height = 20
 	g.Snake = Snake{
-		Body:  []Point{{X: g.Width / 2, Y: g.Height / 2}},
-		Dir:   Point{X: 0, Y: 1},
-		Speed: 1,
+		Body: []Point{{X: g.Width / 2, Y: g.Height / 2}},
+		Dir:  Point{X: 0, Y: 1},
+		Speed: 200 * time.Millisecond,
 	}
+	g.SpawnFood()
 	g.Score = 0
 	g.GameOver = false
-	g.placeFood()
 }
 
-func (g *Game) placeFood() {
+func (g *Game) SpawnFood() {
 	for {
 		x := rand.Intn(g.Width)
 		y := rand.Intn(g.Height)
 		g.Food = Point{X: x, Y: y}
-		if !g.isPointOnSnake(g.Food) {
+		collision := false
+		for _, b := range g.Snake.Body {
+			if b.X == x && b.Y == y {
+				collision = true
+				break
+			}
+		}
+		if !collision {
 			break
 		}
 	}
-}
-
-func (g *Game) isPointOnSnake(p Point) bool {
-	for _, b := range g.Snake.Body {
-		if b == p {
-			return true
-		}
-	}
-	return false
 }
 
 func (g *Game) Update() {
@@ -68,16 +66,23 @@ func (g *Game) Update() {
 	head := g.Snake.Body[0]
 	newHead := Point{X: head.X + g.Snake.Dir.X, Y: head.Y + g.Snake.Dir.Y}
 
-	if newHead.X < 0 || newHead.X >= g.Width || newHead.Y < 0 || newHead.Y >= g.Height || g.isPointOnSnake(newHead) {
+	if newHead.X < 0 || newHead.X >= g.Width || newHead.Y < 0 || newHead.Y >= g.Height {
 		g.GameOver = true
 		return
 	}
 
+	for _, b := range g.Snake.Body {
+		if b.X == newHead.X && b.Y == newHead.Y {
+			g.GameOver = true
+			return
+		}
+	}
+
 	g.Snake.Body = append([]Point{newHead}, g.Snake.Body...)
 
-	if newHead == g.Food {
+	if newHead.X == g.Food.X && newHead.Y == g.Food.Y {
 		g.Score++
-		g.placeFood()
+		g.SpawnFood()
 	} else {
 		g.Snake.Body = g.Snake.Body[:len(g.Snake.Body)-1]
 	}
@@ -90,18 +95,25 @@ func (g *Game) Draw() {
 
 	for y := 0; y < g.Height; y++ {
 		for x := 0; x < g.Width; x++ {
-			p := Point{X: x, Y: y}
-			if g.isPointOnSnake(p) {
-				fmt.Print("O")
-			} else if p == g.Food {
-				fmt.Print("*")
+			cell := " "
+			if x == g.Food.X && y == g.Food.Y {
+				cell = "🍎"
 			} else {
-				fmt.Print(" ")
+				for _, b := range g.Snake.Body {
+					if b.X == x && b.Y == y {
+						cell = "🟩"
+						break
+					}
+				}
 			}
+			fmt.Print(cell)
 		}
 		fmt.Println()
 	}
 	fmt.Printf("Score: %d\n", g.Score)
+	if g.GameOver {
+		fmt.Println("Game Over!")
+	}
 }
 
 func main() {
@@ -109,11 +121,34 @@ func main() {
 	game := Game{}
 	game.Init()
 
-	for !game.GameOver {
-		game.Draw()
-		game.Update()
-		time.Sleep(time.Second / time.Duration(game.Snake.Speed))
-	}
+	go func() {
+		for {
+			var input string
+			fmt.Scanln(&input)
+			switch input {
+			case "w":
+				if game.Snake.Dir.Y == 0 {
+					game.Snake.Dir = Point{X: 0, Y: -1}
+				}
+			case "s":
+				if game.Snake.Dir.Y == 0 {
+					game.Snake.Dir = Point{X: 0, Y: 1}
+				}
+			case "a":
+				if game.Snake.Dir.X == 0 {
+					game.Snake.Dir = Point{X: -1, Y: 0}
+				}
+			case "d":
+				if game.Snake.Dir.X == 0 {
+					game.Snake.Dir = Point{X: 1, Y: 0}
+				}
+			}
+		}
+	}()
 
-	fmt.Println("Game Over!")
+	for !game.GameOver {
+		game.Update()
+		game.Draw()
+		time.Sleep(game.Snake.Speed)
+	}
 }
