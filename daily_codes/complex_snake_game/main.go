@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"time"
+	"github.com/nsf/termbox-go"
 )
 
 type Point struct {
@@ -23,39 +24,18 @@ type Game struct {
 	Food     Point
 	Score    int
 	GameOver bool
-	Width    int
-	Height   int
 }
 
 func (g *Game) Init() {
-	g.Width = 20
-	g.Height = 20
-	g.Snake = Snake{
-		Body: []Point{{X: g.Width / 2, Y: g.Height / 2}},
-		Dir:  Point{X: 0, Y: 1},
-		Speed: 200 * time.Millisecond,
-	}
-	g.SpawnFood()
+	g.Snake = Snake{Body: []Point{{X: 10, Y: 10}}, Dir: Point{X: 0, Y: 1}, Speed: 100 * time.Millisecond}
 	g.Score = 0
 	g.GameOver = false
+	g.placeFood()
 }
 
-func (g *Game) SpawnFood() {
-	for {
-		x := rand.Intn(g.Width)
-		y := rand.Intn(g.Height)
-		g.Food = Point{X: x, Y: y}
-		collision := false
-		for _, b := range g.Snake.Body {
-			if b.X == x && b.Y == y {
-				collision = true
-				break
-			}
-		}
-		if !collision {
-			break
-		}
-	}
+func (g *Game) placeFood() {
+	width, height := termbox.Size()
+	g.Food = Point{X: rand.Intn(width), Y: rand.Intn(height)}
 }
 
 func (g *Game) Update() {
@@ -66,13 +46,13 @@ func (g *Game) Update() {
 	head := g.Snake.Body[0]
 	newHead := Point{X: head.X + g.Snake.Dir.X, Y: head.Y + g.Snake.Dir.Y}
 
-	if newHead.X < 0 || newHead.X >= g.Width || newHead.Y < 0 || newHead.Y >= g.Height {
+	if newHead.X < 0 || newHead.Y < 0 || newHead.X >= termbox.Size().X || newHead.Y >= termbox.Size().Y {
 		g.GameOver = true
 		return
 	}
 
-	for _, b := range g.Snake.Body {
-		if b.X == newHead.X && b.Y == newHead.Y {
+	for _, p := range g.Snake.Body {
+		if p == newHead {
 			g.GameOver = true
 			return
 		}
@@ -80,75 +60,80 @@ func (g *Game) Update() {
 
 	g.Snake.Body = append([]Point{newHead}, g.Snake.Body...)
 
-	if newHead.X == g.Food.X && newHead.Y == g.Food.Y {
+	if newHead == g.Food {
 		g.Score++
-		g.SpawnFood()
+		g.placeFood()
 	} else {
 		g.Snake.Body = g.Snake.Body[:len(g.Snake.Body)-1]
 	}
 }
 
 func (g *Game) Draw() {
-	cmd := exec.Command("clear")
-	cmd.Stdout = os.Stdout
-	cmd.Run()
+	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 
-	for y := 0; y < g.Height; y++ {
-		for x := 0; x < g.Width; x++ {
-			cell := " "
-			if x == g.Food.X && y == g.Food.Y {
-				cell = "🍎"
-			} else {
-				for _, b := range g.Snake.Body {
-					if b.X == x && b.Y == y {
-						cell = "🟩"
-						break
-					}
-				}
-			}
-			fmt.Print(cell)
-		}
-		fmt.Println()
+	for _, p := range g.Snake.Body {
+		termbox.SetCell(p.X, p.Y, 'O', termbox.ColorGreen, termbox.ColorDefault)
 	}
-	fmt.Printf("Score: %d\n", g.Score)
-	if g.GameOver {
-		fmt.Println("Game Over!")
-	}
+
+	termbox.SetCell(g.Food.X, g.Food.Y, 'X', termbox.ColorRed, termbox.ColorDefault)
+
+	termbox.Flush()
 }
 
 func main() {
+	err := termbox.Init()
+	if err != nil {
+		fmt.Println("Failed to initialize termbox:", err)
+		os.Exit(1)
+	}
+	defer termbox.Close()
+
 	rand.Seed(time.Now().UnixNano())
+
 	game := Game{}
 	game.Init()
 
+	eventQueue := make(chan termbox.Event)
 	go func() {
 		for {
-			var input string
-			fmt.Scanln(&input)
-			switch input {
-			case "w":
-				if game.Snake.Dir.Y == 0 {
-					game.Snake.Dir = Point{X: 0, Y: -1}
-				}
-			case "s":
-				if game.Snake.Dir.Y == 0 {
-					game.Snake.Dir = Point{X: 0, Y: 1}
-				}
-			case "a":
-				if game.Snake.Dir.X == 0 {
-					game.Snake.Dir = Point{X: -1, Y: 0}
-				}
-			case "d":
-				if game.Snake.Dir.X == 0 {
-					game.Snake.Dir = Point{X: 1, Y: 0}
-				}
-			}
+			eventQueue <- termbox.PollEvent()
 		}
 	}()
 
-	for !game.GameOver {
-		game.Update()
-		game.Draw()
-		time.Sleep(game.Snake.Speed)
+	gameLoop:
+	for {
+		select {
+		case ev := <-eventQueue:
+			switch ev.Type {
+			case termbox.EventKey:
+				switch ev.Key {
+				case termbox.KeyArrowUp:
+					game.Snake.Dir = Point{X: 0, Y: -1}
+				case termbox.KeyArrowDown:
+					game.Snake.Dir = Point{X: 0, Y: 1}
+				case termbox.KeyArrowLeft:
+					game.Snake.Dir = Point{X: -1, Y: 0}
+				case termbox.KeyArrowRight:
+					game.Snake.Dir = Point{X: 1, Y: 0}
+				case termbox.KeyEsc:
+					break gameLoop
+				}
+			case termbox.EventError:
+				panic(ev.Err)
+			}
+		default:
+			game.Update()
+			game.Draw()
+			time.Sleep(game.Snake.Speed)
+		}
+
+		if game.GameOver {
+			termbox.Close()
+			cmd := exec.Command("clear")
+			cmd.Stdout = os.Stdout
+			cmd.Run()
+			fmt.Printf("Game Over! Score: %d\n", game.Score)
+			break
+		}
 	}
 }
