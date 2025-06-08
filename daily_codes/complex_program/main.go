@@ -6,22 +6,19 @@ import (
 	"time"
 )
 
-func generateRandomNumber() int {
-	rand.Seed(time.Now().UnixNano())
-	return rand.Intn(100)
+func generateRandomNumber(min, max int) int {
+	return rand.Intn(max-min) + min
 }
 
 func main() {
-	fmt.Println("Starting complex program...")
+	rand.Seed(time.Now().UnixNano())
+	fmt.Println("Generating 1000 random numbers between 1 and 100:")
 	for i := 0; i < 1000; i++ {
-		number := generateRandomNumber()
-		fmt.Printf("Generated random number %d: %d\n", i+1, number)
-		if number%2 == 0 {
-			fmt.Println("The number is even.")
-		} else {
-			fmt.Println("The number is odd.")
+		randomNumber := generateRandomNumber(1, 100)
+		fmt.Printf("%d ", randomNumber)
+		if (i+1)%10 == 0 {
+			fmt.Println()
 		}
-		time.Sleep(100 * time.Millisecond)
 	}
-	fmt.Println("Program finished.")
+	fmt.Println("\nDone generating random numbers.")
 }
