@@ -9,34 +9,49 @@ import (
 	"syscall"
 )
 
+type Clock struct {
+	hours, minutes, seconds int
+}
+
+func (c *Clock) Update() {
+	now := time.Now()
+	c.hours = now.Hour()
+	c.minutes = now.Minute()
+	c.seconds = now.Second()
+}
+
+func (c *Clock) Display() {
+	fmt.Printf("\r%02d:%02d:%02d", c.hours, c.minutes, c.seconds)
+}
+
+func generateRandomColor() string {
+	colors := []string{
+		"\033[31m", // Red
+		"\033[32m", // Green
+		"\033[33m", // Yellow
+		"\033[34m", // Blue
+		"\033[35m", // Purple
+		"\033[36m", // Cyan
+		"\033[37m", // White
+	}
+	return colors[rand.Intn(len(colors))]
+}
+
 func main() {
-	// Seed the random number generator
 	rand.Seed(time.Now().UnixNano())
-
-	// Create a channel to listen for interrupt signals
-	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
-
-	// Start a goroutine to handle the clock
+	clock := Clock{}
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		for {
-			// Get the current time
-			now := time.Now()
-			hour, min, sec := now.Hour(), now.Minute(), now.Second()
-
-			// Generate a random color for the clock
-			color := fmt.Sprintf("\033[38;5;%dm", rand.Intn(256))
-			reset := "\033[0m"
-
-			// Print the time with the random color
-			fmt.Printf("%s%02d:%02d:%02d%s\r", color, hour, min, sec, reset)
-
-			// Wait for one second
-			time.Sleep(time.Second)
-		}
+		<-sigs
+		fmt.Println("\nExiting...")
+		os.Exit(0)
 	}()
-
-	// Wait for an interrupt signal
-	<-interrupt
-	fmt.Println("\nClock stopped.")
+	for {
+		clock.Update()
+		color := generateRandomColor()
+		fmt.Print(color)
+		clock.Display()
+		time.Sleep(1 * time.Second)
+	}
 }
