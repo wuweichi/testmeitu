@@ -4,18 +4,36 @@ import (
 	"fmt"
 	"math/rand"
 	"time"
+	"sync"
 )
 
-func generateRandomNumber() int {
+func generateRandomNumbers(count int, wg *sync.WaitGroup, ch chan int) {
+	defer wg.Done()
 	rand.Seed(time.Now().UnixNano()
-	return rand.Intn(100)
+	for i := 0; i < count; i++ {
+		ch <- rand.Intn(100)
+	}
+}
+
+func processNumbers(ch chan int, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for num := range ch {
+		fmt.Printf("Processed number: %d\n", num*2)
+	}
 }
 
 func main() {
-	fmt.Println("Starting complex program...")
-	for i := 0; i < 1000; i++ {
-		num := generateRandomNumber()
-		fmt.Printf("Generated random number %d: %d\n", i+1, num)
-	}
-	fmt.Println("Program completed.")
+	const numCount = 1000
+	var wg sync.WaitGroup
+	ch := make(chan int, numCount)
+
+	wg.Add(1)
+	go generateRandomNumbers(numCount, &wg, ch)
+
+	wg.Add(1)
+	go processNumbers(ch, &wg)
+
+	wg.Wait()
+	close(ch)
+	fmt.Println("All numbers processed.")
 }
