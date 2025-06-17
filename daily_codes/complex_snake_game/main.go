@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"time"
-	"github.com/nsf/termbox-go"
 )
 
 type Point struct {
@@ -14,9 +13,9 @@ type Point struct {
 }
 
 type Snake struct {
-	Body  []Point
-	Dir   Point
-	Speed time.Duration
+	Body      []Point
+	Direction Point
+	Length    int
 }
 
 type Game struct {
@@ -24,18 +23,42 @@ type Game struct {
 	Food     Point
 	Score    int
 	GameOver bool
+	Width    int
+	Height   int
 }
 
 func (g *Game) Init() {
-	g.Snake = Snake{Body: []Point{{X: 10, Y: 10}}, Dir: Point{X: 0, Y: 1}, Speed: 100 * time.Millisecond}
+	g.Width = 20
+	g.Height = 20
+	g.Snake = Snake{
+		Body:      []Point{{X: g.Width / 2, Y: g.Height / 2}},
+		Direction: Point{X: 0, Y: 1},
+		Length:    1,
+	}
 	g.Score = 0
 	g.GameOver = false
 	g.placeFood()
 }
 
 func (g *Game) placeFood() {
-	width, height := termbox.Size()
-	g.Food = Point{X: rand.Intn(width), Y: rand.Intn(height)}
+	for {
+		g.Food = Point{
+			X: rand.Intn(g.Width),
+			Y: rand.Intn(g.Height),
+		}
+		if !g.isPointOnSnake(g.Food) {
+			break
+		}
+	}
+}
+
+func (g *Game) isPointOnSnake(p Point) bool {
+	for _, b := range g.Snake.Body {
+		if b == p {
+			return true
+		}
+	}
+	return false
 }
 
 func (g *Game) Update() {
@@ -44,96 +67,59 @@ func (g *Game) Update() {
 	}
 
 	head := g.Snake.Body[0]
-	newHead := Point{X: head.X + g.Snake.Dir.X, Y: head.Y + g.Snake.Dir.Y}
+	newHead := Point{X: head.X + g.Snake.Direction.X, Y: head.Y + g.Snake.Direction.Y}
 
-	if newHead.X < 0 || newHead.Y < 0 || newHead.X >= termbox.Size().X || newHead.Y >= termbox.Size().Y {
+	if newHead.X < 0 || newHead.X >= g.Width || newHead.Y < 0 || newHead.Y >= g.Height || g.isPointOnSnake(newHead) {
 		g.GameOver = true
 		return
 	}
 
-	for _, p := range g.Snake.Body {
-		if p == newHead {
-			g.GameOver = true
-			return
-		}
-	}
-
 	g.Snake.Body = append([]Point{newHead}, g.Snake.Body...)
+	if len(g.Snake.Body) > g.Snake.Length {
+		g.Snake.Body = g.Snake.Body[:len(g.Snake.Body)-1]
+	}
 
 	if newHead == g.Food {
 		g.Score++
+		g.Snake.Length++
 		g.placeFood()
-	} else {
-		g.Snake.Body = g.Snake.Body[:len(g.Snake.Body)-1]
 	}
 }
 
 func (g *Game) Draw() {
-	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+	cmd := exec.Command("clear")
+	cmd.Stdout = os.Stdout
+	cmd.Run()
 
-	for _, p := range g.Snake.Body {
-		termbox.SetCell(p.X, p.Y, 'O', termbox.ColorGreen, termbox.ColorDefault)
+	for y := 0; y < g.Height; y++ {
+		for x := 0; x < g.Width; x++ {
+			p := Point{X: x, Y: y}
+			if g.isPointOnSnake(p) {
+				fmt.Print("■")
+			} else if p == g.Food {
+				fmt.Print("★")
+			} else {
+				fmt.Print("□")
+			}
+			fmt.Print(" ")
+		}
+		fmt.Println()
 	}
-
-	termbox.SetCell(g.Food.X, g.Food.Y, 'X', termbox.ColorRed, termbox.ColorDefault)
-
-	termbox.Flush()
+	fmt.Printf("Score: %d\n", g.Score)
+	if g.GameOver {
+		fmt.Println("Game Over!")
+	}
 }
 
 func main() {
-	err := termbox.Init()
-	if err != nil {
-		fmt.Println("Failed to initialize termbox:", err)
-		os.Exit(1)
-	}
-	defer termbox.Close()
-
 	rand.Seed(time.Now().UnixNano())
-
 	game := Game{}
 	game.Init()
 
-	eventQueue := make(chan termbox.Event)
-	go func() {
-		for {
-			eventQueue <- termbox.PollEvent()
-		}
-	}()
-
-	gameLoop:
-	for {
-		select {
-		case ev := <-eventQueue:
-			switch ev.Type {
-			case termbox.EventKey:
-				switch ev.Key {
-				case termbox.KeyArrowUp:
-					game.Snake.Dir = Point{X: 0, Y: -1}
-				case termbox.KeyArrowDown:
-					game.Snake.Dir = Point{X: 0, Y: 1}
-				case termbox.KeyArrowLeft:
-					game.Snake.Dir = Point{X: -1, Y: 0}
-				case termbox.KeyArrowRight:
-					game.Snake.Dir = Point{X: 1, Y: 0}
-				case termbox.KeyEsc:
-					break gameLoop
-				}
-			case termbox.EventError:
-				panic(ev.Err)
-			}
-		default:
-			game.Update()
-			game.Draw()
-			time.Sleep(game.Snake.Speed)
-		}
-
-		if game.GameOver {
-			termbox.Close()
-			cmd := exec.Command("clear")
-			cmd.Stdout = os.Stdout
-			cmd.Run()
-			fmt.Printf("Game Over! Score: %d\n", game.Score)
-			break
-		}
+	for !game.GameOver {
+		game.Draw()
+		time.Sleep(200 * time.Millisecond)
+		game.Update()
 	}
+	game.Draw()
 }
