@@ -6,25 +6,14 @@ import (
 	"time"
 )
 
-func generateRandomNumber() int {
-	return rand.Intn(100)
-}
-
-func calculateFactorial(n int) int {
-	if n == 0 {
-		return 1
-	}
-	return n * calculateFactorial(n-1)
+func generateRandomNumber(min, max int) int {
+	return rand.Intn(max-min) + min
 }
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	num := generateRandomNumber()
-	fmt.Printf("Random number generated: %d\n", num)
-	fact := calculateFactorial(num)
-	fmt.Printf("Factorial of %d is %d\n", num, fact)
-	// The following loop is to artificially increase the code length to meet the requirement
 	for i := 0; i < 1000; i++ {
-		// This loop does nothing but increase the line count
+		randomNumber := generateRandomNumber(1, 100)
+		fmt.Printf("Random number %d: %d\n", i+1, randomNumber)
 	}
 }
