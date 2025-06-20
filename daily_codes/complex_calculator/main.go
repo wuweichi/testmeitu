@@ -3,42 +3,89 @@ package main
 import (
 	"fmt"
 	"math"
-	"math/rand"
-	"time"
+	"os"
+	"strconv"
 )
 
-func generateRandomNumbers(count int) []float64 {
-	rand.Seed(time.Now().UnixNano())
-	numbers := make([]float64, count)
-	for i := range numbers {
-		numbers[i] = rand.Float64() * 100
-	}
-	return numbers
+func add(a, b float64) float64 {
+	return a + b
 }
 
-func calculateAverage(numbers []float64) float64 {
-	sum := 0.0
-	for _, num := range numbers {
-		sum += num
-	}
-	return sum / float64(len(numbers))
+func subtract(a, b float64) float64 {
+	return a - b
 }
 
-func calculateStandardDeviation(numbers []float64, average float64) float64 {
-	sum := 0.0
-	for _, num := range numbers {
-		sum += math.Pow(num-average, 2)
+func multiply(a, b float64) float64 {
+	return a * b
+}
+
+func divide(a, b float64) (float64, error) {
+	if b == 0 {
+		return 0, fmt.Errorf("cannot divide by zero")
 	}
-	variance := sum / float64(len(numbers))
-	return math.Sqrt(variance)
+	return a / b, nil
+}
+
+func power(a, b float64) float64 {
+	return math.Pow(a, b)
+}
+
+func sqrt(a float64) (float64, error) {
+	if a < 0 {
+		return 0, fmt.Errorf("cannot take square root of negative number")
+	}
+	return math.Sqrt(a), nil
 }
 
 func main() {
-	numbers := generateRandomNumbers(1000)
-	average := calculateAverage(numbers)
-	standardDeviation := calculateStandardDeviation(numbers, average)
+	if len(os.Args) < 4 {
+		fmt.Println("Usage: calculator <operation> <operand1> <operand2>")
+		fmt.Println("Operations: add, subtract, multiply, divide, power, sqrt")
+		os.Exit(1)
+	}
 
-	fmt.Printf("Generated %d random numbers\n", len(numbers))
-	fmt.Printf("Average: %.2f\n", average)
-	fmt.Printf("Standard Deviation: %.2f\n", standardDeviation)
+	operation := os.Args[1]
+	a, err := strconv.ParseFloat(os.Args[2], 64)
+	if err != nil {
+		fmt.Println("Invalid operand1:", err)
+		os.Exit(1)
+	}
+
+	var b float64
+	if operation != "sqrt" {
+		b, err = strconv.ParseFloat(os.Args[3], 64)
+		if err != nil {
+			fmt.Println("Invalid operand2:", err)
+			os.Exit(1)
+		}
+	}
+
+	var result float64
+	switch operation {
+	case "add":
+		result = add(a, b)
+	case "subtract":
+		result = subtract(a, b)
+	case "multiply":
+		result = multiply(a, b)
+	case "divide":
+		result, err = divide(a, b)
+		if err != nil {
+			fmt.Println("Error:", err)
+			os.Exit(1)
+		}
+	case "power":
+		result = power(a, b)
+	case "sqrt":
+		result, err = sqrt(a)
+		if err != nil {
+			fmt.Println("Error:", err)
+			os.Exit(1)
+		}
+	default:
+		fmt.Println("Unknown operation:", operation)
+		os.Exit(1)
+	}
+
+	fmt.Println("Result:", result)
 }
