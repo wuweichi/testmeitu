@@ -7,20 +7,15 @@ import (
 )
 
 func generateRandomNumber(min, max int) int {
-	rand.Seed(time.Now().UnixNano()
-	return rand.Intn(max - min + 1) + min
+	return rand.Intn(max-min) + min
 }
 
 func main() {
-	fmt.Println("Welcome to the Complex Go Program!")
-	fmt.Println("Generating a random number between 1 and 100...")
-	randomNumber := generateRandomNumber(1, 100)
-	fmt.Printf("The random number is: %d\n", randomNumber)
-
-	// Additional complex logic to meet the 1000+ lines requirement would be added here
-	// For brevity, this example is simplified
+	rand.Seed(time.Now().UnixNano())
+	fmt.Println("Generating 1000 random numbers between 1 and 100:")
 	for i := 0; i < 1000; i++ {
-		// Simulate complex operations
+		randomNumber := generateRandomNumber(1, 100)
+		fmt.Printf("Random number %d: %d\n", i+1, randomNumber)
 	}
-	fmt.Println("Program execution completed.")
+	fmt.Println("Finished generating random numbers.")
 }
