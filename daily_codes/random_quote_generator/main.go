@@ -10,17 +10,16 @@ var quotes = []string{
 	"The only limit to our realization of tomorrow is our doubts of today. - Franklin D. Roosevelt",
 	"Life is what happens when you're busy making other plans. - John Lennon",
 	"The way to get started is to quit talking and begin doing. - Walt Disney",
-	"Your time is limited, so don't waste it living someone else's life. - Steve Jobs",
-	"The future belongs to those who believe in the beauty of their dreams. - Eleanor Roosevelt",
-	"Do not watch the clock. Do what it does. Keep going. - Sam Levenson",
-	"You must be the change you wish to see in the world. - Mahatma Gandhi",
-	"Whatever you are, be a good one. - Abraham Lincoln",
-	"The best way to predict the future is to invent it. - Alan Kay",
-	"Strive not to be a success, but rather to be of value. - Albert Einstein",
+	"It's not whether you get knocked down, it's whether you get up. - Vince Lombardi",
+	"If you look at what you have in life, you'll always have more. If you look at what you don't have in life, you'll never have enough. - Oprah Winfrey",
+	"The best and most beautiful things in the world cannot be seen or even touched - they must be felt with the heart. - Helen Keller",
+	"Keep your face always toward the sunshine - and shadows will fall behind you. - Walt Whitman",
+	"You will face many defeats in life, but never let yourself be defeated. - Maya Angelou",
+	"The only impossible journey is the one you never begin. - Tony Robbins",
+	"In the end, it's not the years in your life that count. It's the life in your years. - Abraham Lincoln",
 }
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	randomQuote := quotes[rand.Intn(len(quotes))]
-	fmt.Println(randomQuote)
+	fmt.Println(quotes[rand.Intn(len(quotes))])
 }
