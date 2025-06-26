@@ -87,5 +87,5 @@ func main() {
 		return
 	}
 
-	fmt.Printf("Result: %v\n", result)
+	fmt.Printf("Result: %f\n", result)
 }
