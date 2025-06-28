@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	fmt.Println("Welcome to the Fun Number Guessing Game!")
+	fmt.Println("Welcome to the Number Guessing Game!")
 	fmt.Println("I'm thinking of a number between 1 and 100. Can you guess it?")
 
 	rand.Seed(time.Now().UnixNano())
@@ -18,11 +18,7 @@ func main() {
 
 	for {
 		fmt.Print("Enter your guess: ")
-		_, err := fmt.Scanf("%d", &guess)
-		if err != nil {
-			fmt.Println("Please enter a valid number!")
-			continue
-		}
+		fmt.Scanln(&guess)
 		attempts++
 
 		if guess < target {
@@ -30,7 +26,7 @@ func main() {
 		} else if guess > target {
 			fmt.Println("Too high! Try again.")
 		} else {
-			fmt.Printf("Congratulations! You've guessed the number in %d attempts!\n", attempts)
+			fmt.Printf("Congratulations! You guessed the number in %d attempts.\n", attempts)
 			break
 		}
 	}
