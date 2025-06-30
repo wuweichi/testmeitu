@@ -3,89 +3,69 @@ package main
 import (
 	"fmt"
 	"math"
-	"os"
-	"strconv"
+	"math/rand"
+	"time"
 )
 
-func add(a, b float64) float64 {
-	return a + b
-}
-
-func subtract(a, b float64) float64 {
-	return a - b
-}
-
-func multiply(a, b float64) float64 {
-	return a * b
-}
-
-func divide(a, b float64) (float64, error) {
-	if b == 0 {
-		return 0, fmt.Errorf("cannot divide by zero")
-	}
-	return a / b, nil
-}
-
-func power(a, b float64) float64 {
-	return math.Pow(a, b)
-}
-
-func sqrt(a float64) (float64, error) {
-	if a < 0 {
-		return 0, fmt.Errorf("cannot take square root of negative number")
-	}
-	return math.Sqrt(a), nil
-}
-
 func main() {
-	if len(os.Args) < 4 {
-		fmt.Println("Usage: calculator <operation> <operand1> <operand2>")
-		fmt.Println("Operations: add, subtract, multiply, divide, power, sqrt")
-		return
-	}
+	fmt.Println("Welcome to the Complex Calculator!")
+	fmt.Println("This program demonstrates a variety of mathematical operations.")
 
-	operation := os.Args[1]
-	operand1, err := strconv.ParseFloat(os.Args[2], 64)
-	if err != nil {
-		fmt.Println("Invalid operand1")
-		return
-	}
+	// Seed the random number generator
+	rand.Seed(time.Now().UnixNano())
 
-	var operand2 float64
-	if operation != "sqrt" {
-		operand2, err = strconv.ParseFloat(os.Args[3], 64)
-		if err != nil {
-			fmt.Println("Invalid operand2")
-			return
+	// Generate two random numbers
+	a := rand.Float64() * 100
+	b := rand.Float64() * 100
+
+	// Perform and display basic operations
+	fmt.Printf("a = %.2f, b = %.2f\n", a, b)
+	fmt.Printf("a + b = %.2f\n", a+b)
+	fmt.Printf("a - b = %.2f\n", a-b)
+	fmt.Printf("a * b = %.2f\n", a*b)
+	fmt.Printf("a / b = %.2f\n", a/b)
+
+	// Perform and display advanced operations
+	fmt.Printf("sqrt(a) = %.2f\n", math.Sqrt(a))
+	fmt.Printf("pow(a, b) = %.2f\n", math.Pow(a, b))
+	fmt.Printf("sin(a) = %.2f\n", math.Sin(a))
+	fmt.Printf("cos(b) = %.2f\n", math.Cos(b))
+
+	// Demonstrate loops and conditionals
+	fmt.Println("\nGenerating 10 random numbers between 0 and 100:")
+	for i := 0; i < 10; i++ {
+		num := rand.Float64() * 100
+		fmt.Printf("%.2f ", num)
+		if num > 50 {
+			fmt.Println("(greater than 50)")
+		} else {
+			fmt.Println("(50 or less)")
 		}
 	}
 
-	var result float64
-	switch operation {
-	case "add":
-		result = add(operand1, operand2)
-	case "subtract":
-		result = subtract(operand1, operand2)
-	case "multiply":
-		result = multiply(operand1, operand2)
-	case "divide":
-		result, err = divide(operand1, operand2)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-	case "power":
-		result = power(operand1, operand2)
-	case "sqrt":
-		result, err = sqrt(operand1)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-	default:
-		fmt.Println("Invalid operation")
-		return
-	}
+	// Demonstrate a slice and its operations
+	numbers := []float64{a, b, a + b, a - b, a * b, a / b}
+	fmt.Println("\nNumbers slice:", numbers)
+	fmt.Println("Sum of numbers:", sumSlice(numbers))
+	fmt.Println("Average of numbers:", averageSlice(numbers))
 
-	fmt.Printf("Result: %f\n", result)
+	// End of program
+	fmt.Println("\nThank you for using the Complex Calculator!")
+}
+
+// sumSlice calculates the sum of all elements in a slice of float64
+func sumSlice(s []float64) float64 {
+	sum := 0.0
+	for _, v := range s {
+		sum += v
+	}
+	return sum
+}
+
+// averageSlice calculates the average of all elements in a slice of float64
+func averageSlice(s []float64) float64 {
+	if len(s) == 0 {
+		return 0
+	}
+	return sumSlice(s) / float64(len(s))
 }
