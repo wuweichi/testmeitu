@@ -16,27 +16,32 @@ func generateRandomNumbers(count int) []float64 {
 	return numbers
 }
 
-func calculateMean(numbers []float64) float64 {
+func calculateSum(numbers []float64) float64 {
 	sum := 0.0
 	for _, num := range numbers {
 		sum += num
 	}
-	return sum / float64(len(numbers))
+	return sum
 }
 
-func calculateStandardDeviation(numbers []float64, mean float64) float64 {
-	sum := 0.0
+func calculateAverage(numbers []float64) float64 {
+	return calculateSum(numbers) / float64(len(numbers))
+}
+
+func calculateStandardDeviation(numbers []float64) float64 {
+	average := calculateAverage(numbers)
+	variance := 0.0
 	for _, num := range numbers {
-		sum += math.Pow(num-mean, 2)
+		variance += math.Pow(num-average, 2)
 	}
-	return math.Sqrt(sum / float64(len(numbers)))
+	variance = variance / float64(len(numbers))
+	return math.Sqrt(variance)
 }
 
 func main() {
 	numbers := generateRandomNumbers(1000)
-	mean := calculateMean(numbers)
-	stdDev := calculateStandardDeviation(numbers, mean)
 	fmt.Printf("Generated %d random numbers\n", len(numbers))
-	fmt.Printf("Mean: %.2f\n", mean)
-	fmt.Printf("Standard Deviation: %.2f\n", stdDev)
+	fmt.Printf("Sum: %.2f\n", calculateSum(numbers))
+	fmt.Printf("Average: %.2f\n", calculateAverage(numbers))
+	fmt.Printf("Standard Deviation: %.2f\n", calculateStandardDeviation(numbers))
 }
