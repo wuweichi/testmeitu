@@ -13,10 +13,10 @@ var quotes = []string{
 	"It's not whether you get knocked down, it's whether you get up. - Vince Lombardi",
 	"If you look at what you have in life, you'll always have more. - Oprah Winfrey",
 	"The best and most beautiful things in the world cannot be seen or even touched - they must be felt with the heart. - Helen Keller",
-	"Whoever is happy will make others happy too. - Anne Frank",
 	"Do not go where the path may lead, go instead where there is no path and leave a trail. - Ralph Waldo Emerson",
+	"In the end, it's not the years in your life that count. It's the life in your years. - Abraham Lincoln",
 	"You will face many defeats in life, but never let yourself be defeated. - Maya Angelou",
-	"The future belongs to those who believe in the beauty of their dreams. - Eleanor Roosevelt",
+	"Never let the fear of striking out keep you from playing the game. - Babe Ruth",
 }
 
 func main() {
