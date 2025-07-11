@@ -8,18 +8,19 @@ import (
 
 var quotes = []string{
 	"The only limit to our realization of tomorrow is our doubts of today. - Franklin D. Roosevelt",
-	"Life is what happens when you're busy making other plans. - John Lennon",
-	"The way to get started is to quit talking and begin doing. - Walt Disney",
-	"It's not whether you get knocked down, it's whether you get up. - Vince Lombardi",
-	"If you look at what you have in life, you'll always have more. - Oprah Winfrey",
-	"The best and most beautiful things in the world cannot be seen or even touched - they must be felt with the heart. - Helen Keller",
-	"Do not go where the path may lead, go instead where there is no path and leave a trail. - Ralph Waldo Emerson",
-	"In the end, it's not the years in your life that count. It's the life in your years. - Abraham Lincoln",
-	"You will face many defeats in life, but never let yourself be defeated. - Maya Angelou",
-	"Never let the fear of striking out keep you from playing the game. - Babe Ruth",
+	"Do not watch the clock. Do what it does. Keep going. - Sam Levenson",
+	"The secret of getting ahead is getting started. - Mark Twain",
+	"You miss 100% of the shots you don’t take. - Wayne Gretzky",
+	"Whether you think you can or you think you can’t, you’re right. - Henry Ford",
+	"The best time to plant a tree was 20 years ago. The second best time is now. - Chinese Proverb",
+	"It’s not whether you get knocked down, it’s whether you get up. - Vince Lombardi",
+	"If you’re going through hell, keep going. - Winston Churchill",
+	"People who are crazy enough to think they can change the world, are the ones who do. - Rob Siltanen",
+	"We may encounter many defeats but we must not be defeated. - Maya Angelou",
 }
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	fmt.Println(quotes[rand.Intn(len(quotes))])
+	randomIndex := rand.Intn(len(quotes))
+	fmt.Println(quotes[randomIndex])
 }
