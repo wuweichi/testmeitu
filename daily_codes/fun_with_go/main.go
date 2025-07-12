@@ -22,7 +22,7 @@ func main() {
 		fmt.Print("Enter your guess: ")
 		_, err := fmt.Scanf("%d", &guess)
 		if err != nil {
-			fmt.Println("Please enter a valid number.")
+			fmt.Println("Please enter a valid number!")
 			continue
 		}
 		attempts++
@@ -32,7 +32,7 @@ func main() {
 		} else if guess > target {
 			fmt.Println("Too high! Try again.")
 		} else {
-			fmt.Printf("Congratulations! You guessed the number in %d attempts.\n", attempts)
+			fmt.Printf("Congratulations! You've guessed the number in %d attempts!\n", attempts)
 			break
 		}
 	}
