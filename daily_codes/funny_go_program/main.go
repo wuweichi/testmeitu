@@ -8,12 +8,14 @@ import (
 
 func main() {
 	fmt.Println("Welcome to the Funny Number Generator!")
-	fmt.Println("Generating 1000 random numbers between 1 and 100...")
-	
+	fmt.Println("This program generates and prints 1000 random numbers between 1 and 100.")
+	fmt.Println("Let's start!")
+
 	rand.Seed(time.Now().UnixNano())
 	for i := 0; i < 1000; i++ {
-		randomNumber := rand.Intn(100) + 1
-		fmt.Printf("Number %d: %d\n", i+1, randomNumber)
+		number := rand.Intn(100) + 1
+		fmt.Printf("Random number %d: %d\n", i+1, number)
 	}
-	fmt.Println("Done generating numbers. Have a funny day!")
+
+	fmt.Println("That's all! Thanks for using the Funny Number Generator.")
 }
