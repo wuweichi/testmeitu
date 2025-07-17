@@ -11,12 +11,12 @@ var quotes = []string{
 	"Life is what happens when you're busy making other plans. - John Lennon",
 	"The way to get started is to quit talking and begin doing. - Walt Disney",
 	"It's not whether you get knocked down, it's whether you get up. - Vince Lombardi",
+	"The future belongs to those who believe in the beauty of their dreams. - Eleanor Roosevelt",
 	"Do not watch the clock. Do what it does. Keep going. - Sam Levenson",
+	"You miss 100% of the shots you don’t take. - Wayne Gretzky",
 	"The only way to do great work is to love what you do. - Steve Jobs",
 	"If you can dream it, you can do it. - Walt Disney",
-	"The future belongs to those who believe in the beauty of their dreams. - Eleanor Roosevelt",
-	"You must be the change you wish to see in the world. - Mahatma Gandhi",
-	"Strive not to be a success, but rather to be of value. - Albert Einstein",
+	"Success is not final, failure is not fatal: It is the courage to continue that counts. - Winston Churchill",
 }
 
 func main() {
