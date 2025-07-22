@@ -3,58 +3,44 @@ package main
 import (
 	"fmt"
 	"time"
-	"math/rand"
+	"github.com/faiface/beep"
+	"github.com/faiface/beep/mp3"
+	"github.com/faiface/beep/speaker"
 	"os"
-	"os/signal"
-	"syscall"
 )
 
-type Clock struct {
-	hours, minutes, seconds int
-}
-
-func (c *Clock) Update() {
-	now := time.Now()
-	c.hours = now.Hour()
-	c.minutes = now.Minute()
-	c.seconds = now.Second()
-}
-
-func (c *Clock) Display() {
-	fmt.Printf("\r%02d:%02d:%02d", c.hours, c.minutes, c.seconds)
-}
-
-func generateRandomColor() string {
-	colors := []string{
-		"\033[31m", // Red
-		"\033[32m", // Green
-		"\033[33m", // Yellow
-		"\033[34m", // Blue
-		"\033[35m", // Magenta
-		"\033[36m", // Cyan
+func playSound() {
+	f, err := os.Open("alarm.mp3")
+	if err != nil {
+		fmt.Println("Could not open the file", err)
+		return
 	}
-	return colors[rand.Intn(len(colors))]
+	streamer, format, err := mp3.Decode(f)
+	if err != nil {
+		fmt.Println("Could not decode the file", err)
+		return
+	}
+	defer streamer.Close()
+	speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
+	done := make(chan bool)
+	speaker.Play(beep.Seq(streamer, beep.Callback(func() {
+		done <- true
+	})))
+	<-done
+}
+
+func displayTime() {
+	for {
+		now := time.Now()
+		fmt.Printf("\r%02d:%02d:%02d", now.Hour(), now.Minute(), now.Second())
+		time.Sleep(1 * time.Second)
+		if now.Second() == 0 {
+			go playSound()
+		}
+	}
 }
 
 func main() {
-	clock := Clock{}
-	rand.Seed(time.Now().UnixNano())
-
-	// Handle interrupt signal for graceful shutdown
-	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
-
-	go func() {
-		<-interrupt
-		fmt.Println("\nExiting...")
-		os.Exit(0)
-	}()
-
-	for {
-		clock.Update()
-		color := generateRandomColor()
-		fmt.Print(color)
-		clock.Display()
-		time.Sleep(1 * time.Second)
-	}
+	fmt.Println("Starting the complex clock...")
+	displayTime()
 }
