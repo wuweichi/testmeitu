@@ -3,83 +3,40 @@ package main
 import (
 	"fmt"
 	"math"
-	"os"
-	"strconv"
+	"math/rand"
+	"time"
 )
 
-func add(a, b float64) float64 {
-	return a + b
-}
-
-func subtract(a, b float64) float64 {
-	return a - b
-}
-
-func multiply(a, b float64) float64 {
-	return a * b
-}
-
-func divide(a, b float64) float64 {
-	if b == 0 {
-		fmt.Println("Error: Division by zero")
-		os.Exit(1)
-	}
-	return a / b
-}
-
-func power(a, b float64) float64 {
-	return math.Pow(a, b)
-}
-
-func sqrt(a float64) float64 {
-	if a < 0 {
-		fmt.Println("Error: Square root of negative number")
-		os.Exit(1)
-	}
-	return math.Sqrt(a)
-}
-
 func main() {
-	if len(os.Args) < 4 {
-		fmt.Println("Usage: calculator <operation> <operand1> <operand2>")
-		fmt.Println("Operations: add, subtract, multiply, divide, power, sqrt")
-		os.Exit(1)
-	}
+	// Seed the random number generator
+	rand.Seed(time.Now().UnixNano())
 
-	operation := os.Args[1]
-	a, err := strconv.ParseFloat(os.Args[2], 64)
-	if err != nil {
-		fmt.Println("Error parsing operand1:", err)
-		os.Exit(1)
-	}
+	// Generate two random numbers
+	a := rand.Intn(100)
+	b := rand.Intn(100)
 
-	var b float64
-	if operation != "sqrt" {
-		b, err = strconv.ParseFloat(os.Args[3], 64)
-		if err != nil {
-			fmt.Println("Error parsing operand2:", err)
-			os.Exit(1)
-		}
+	// Perform and print various mathematical operations
+	fmt.Printf("Generated numbers: %d and %d\n", a, b)
+	fmt.Printf("Addition: %d + %d = %d\n", a, b, a+b)
+	fmt.Printf("Subtraction: %d - %d = %d\n", a, b, a-b)
+	fmt.Printf("Multiplication: %d * %d = %d\n", a, b, a*b)
+	if b != 0 {
+		fmt.Printf("Division: %d / %d = %.2f\n", a, b, float64(a)/float64(b))
+	} else {
+		fmt.Println("Division by zero is undefined")
 	}
+	fmt.Printf("Modulus: %d %% %d = %d\n", a, b, a%b)
+	fmt.Printf("Power: %d^%d = %.2f\n", a, b, math.Pow(float64(a), float64(b)))
+	fmt.Printf("Square root of %d: %.2f\n", a, math.Sqrt(float64(a)))
+	fmt.Printf("Square root of %d: %.2f\n", b, math.Sqrt(float64(b)))
 
-	var result float64
-	switch operation {
-	case "add":
-		result = add(a, b)
-	case "subtract":
-		result = subtract(a, b)
-	case "multiply":
-		result = multiply(a, b)
-	case "divide":
-		result = divide(a, b)
-	case "power":
-		result = power(a, b)
-	case "sqrt":
-		result = sqrt(a)
-	default:
-		fmt.Println("Unknown operation:", operation)
-		os.Exit(1)
-	}
+	// Generate a random angle in degrees
+	angle := rand.Float64() * 360
+	radians := angle * math.Pi / 180
+	fmt.Printf("\nRandom angle: %.2f degrees\n", angle)
+	fmt.Printf("Sine: %.2f\n", math.Sin(radians))
+	fmt.Printf("Cosine: %.2f\n", math.Cos(radians))
+	fmt.Printf("Tangent: %.2f\n", math.Tan(radians))
 
-	fmt.Println("Result:", result)
+	// More operations can be added here to extend the program
 }
