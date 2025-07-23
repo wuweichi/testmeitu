@@ -11,15 +11,15 @@ func main() {
 	for i := 0; i < 1000; i++ {
 		switch rand.Intn(5) {
 		case 0:
-			fmt.Println("Why don't scientists trust atoms? Because they make up everything!")
+			fmt.Println("Why did the programmer quit his job? Because he didn't get arrays.")
 		case 1:
-			fmt.Println("Did you hear about the mathematician who's afraid of negative numbers? He'll stop at nothing to avoid them.")
+			fmt.Println("Why do programmers always mix up Halloween and Christmas? Because Oct 31 == Dec 25!")
 		case 2:
-			fmt.Println("Why did the scarecrow win an award? Because he was outstanding in his field!")
+			fmt.Println("How many programmers does it take to change a light bulb? None, that's a hardware problem.")
 		case 3:
-			fmt.Println("I told my wife she was drawing her eyebrows too high. She looked surprised.")
+			fmt.Println("Why do Java developers wear glasses? Because they can't C#.")
 		case 4:
-			fmt.Println("Why can't you explain puns to kleptomaniacs? Because they always take things literally.")
+			fmt.Println("Why was the JavaScript developer sad? Because he didn't know how to 'null' his feelings.")
 		}
 	}
 }
