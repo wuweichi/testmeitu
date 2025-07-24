@@ -12,10 +12,10 @@ func generateRandomNumber() int {
 }
 
 func main() {
-	fmt.Println("Starting the complex program...")
+	fmt.Println("Starting complex program...")
 	for i := 0; i < 1000; i++ {
 		randomNum := generateRandomNumber()
 		fmt.Printf("Iteration %d: Random number is %d\n", i, randomNum)
 	}
-	fmt.Println("Program completed successfully.")
+	fmt.Println("Program completed.")
 }
