@@ -6,20 +6,21 @@ import (
 	"time"
 )
 
-var quotes = []string{
-	"The only limit to our realization of tomorrow is our doubts of today. - Franklin D. Roosevelt",
-	"Life is what happens when you're busy making other plans. - John Lennon",
-	"It is during our darkest moments that we must focus to see the light. - Aristotle",
-	"Do not go where the path may lead, go instead where there is no path and leave a trail. - Ralph Waldo Emerson",
-	"The future belongs to those who believe in the beauty of their dreams. - Eleanor Roosevelt",
-	"You must be the change you wish to see in the world. - Mahatma Gandhi",
-	"In the end, it's not the years in your life that count. It's the life in your years. - Abraham Lincoln",
-	"You only live once, but if you do it right, once is enough. - Mae West",
-	"The greatest glory in living lies not in never falling, but in rising every time we fall. - Nelson Mandela",
-	"Life is either a daring adventure or nothing at all. - Helen Keller",
-}
-
 func main() {
+	quotes := []string{
+		"The only limit to our realization of tomorrow is our doubts of today. - Franklin D. Roosevelt",
+		"Life is what happens when you're busy making other plans. - John Lennon",
+		"The way to get started is to quit talking and begin doing. - Walt Disney",
+		"It's not whether you get knocked down, it's whether you get up. - Vince Lombardi",
+		"Do not watch the clock. Do what it does. Keep going. - Sam Levenson",
+		"The only way to do great work is to love what you do. - Steve Jobs",
+		"If you can dream it, you can do it. - Walt Disney",
+		"The best revenge is massive success. - Frank Sinatra",
+		"You miss 100% of the shots you don't take. - Wayne Gretzky",
+		"I have not failed. I've just found 10,000 ways that won't work. - Thomas Edison",
+	}
+
 	rand.Seed(time.Now().UnixNano())
-	fmt.Println(quotes[rand.Intn(len(quotes))])
+	randomIndex := rand.Intn(len(quotes))
+	fmt.Println(quotes[randomIndex])
 }
