@@ -12,31 +12,31 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	// Generate two random numbers
-	a := rand.Intn(100)
-	b := rand.Intn(100)
+	a := rand.Float64() * 100
+	b := rand.Float64() * 100
 
 	// Perform and print various mathematical operations
-	fmt.Printf("Generated numbers: %d and %d\n", a, b)
-	fmt.Printf("Addition: %d + %d = %d\n", a, b, a+b)
-	fmt.Printf("Subtraction: %d - %d = %d\n", a, b, a-b)
-	fmt.Printf("Multiplication: %d * %d = %d\n", a, b, a*b)
-	if b != 0 {
-		fmt.Printf("Division: %d / %d = %.2f\n", a, b, float64(a)/float64(b))
-	} else {
-		fmt.Println("Division by zero is undefined")
-	}
-	fmt.Printf("Modulus: %d %% %d = %d\n", a, b, a%b)
-	fmt.Printf("Power: %d^%d = %.2f\n", a, b, math.Pow(float64(a), float64(b)))
-	fmt.Printf("Square root of %d: %.2f\n", a, math.Sqrt(float64(a)))
-	fmt.Printf("Square root of %d: %.2f\n", b, math.Sqrt(float64(b)))
-
-	// Generate a random angle in degrees
-	angle := rand.Float64() * 360
-	radians := angle * math.Pi / 180
-	fmt.Printf("\nRandom angle: %.2f degrees\n", angle)
-	fmt.Printf("Sine: %.2f\n", math.Sin(radians))
-	fmt.Printf("Cosine: %.2f\n", math.Cos(radians))
-	fmt.Printf("Tangent: %.2f\n", math.Tan(radians))
-
-	// More operations can be added here to extend the program
+	fmt.Printf("Generated numbers: %.2f and %.2f\n", a, b)
+	fmt.Printf("Addition: %.2f\n", a+b)
+	fmt.Printf("Subtraction: %.2f\n", a-b)
+	fmt.Printf("Multiplication: %.2f\n", a*b)
+	fmt.Printf("Division: %.2f\n", a/b)
+	fmt.Printf("Square root of first number: %.2f\n", math.Sqrt(a))
+	fmt.Printf("Power (first to the second): %.2f\n", math.Pow(a, b))
+	fmt.Printf("Sine of first number: %.2f\n", math.Sin(a))
+	fmt.Printf("Cosine of first number: %.2f\n", math.Cos(a))
+	fmt.Printf("Tangent of first number: %.2f\n", math.Tan(a))
+	fmt.Printf("Logarithm (base 10) of first number: %.2f\n", math.Log10(a))
+	fmt.Printf("Natural logarithm of first number: %.2f\n", math.Log(a))
+	fmt.Printf("Absolute value of subtraction: %.2f\n", math.Abs(a-b))
+	fmt.Printf("Ceiling of first number: %.2f\n", math.Ceil(a))
+	fmt.Printf("Floor of first number: %.2f\n", math.Floor(a))
+	fmt.Printf("Round of first number: %.2f\n", math.Round(a))
+	fmt.Printf("Maximum of the two numbers: %.2f\n", math.Max(a, b))
+	fmt.Printf("Minimum of the two numbers: %.2f\n", math.Min(a, b))
+	fmt.Printf("Exponential of first number: %.2f\n", math.Exp(a))
+	fmt.Printf("Modulo (remainder of division): %.2f\n", math.Mod(a, b))
+	fmt.Printf("Hyperbolic sine of first number: %.2f\n", math.Sinh(a))
+	fmt.Printf("Hyperbolic cosine of first number: %.2f\n", math.Cosh(a))
+	fmt.Printf("Hyperbolic tangent of first number: %.2f\n", math.Tanh(a))
 }
