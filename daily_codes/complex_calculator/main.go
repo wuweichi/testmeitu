@@ -12,31 +12,61 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	// Generate two random numbers
-	a := rand.Float64() * 100
-	b := rand.Float64() * 100
+	a := rand.Intn(100)
+	b := rand.Intn(100)
 
 	// Perform and print various mathematical operations
-	fmt.Printf("Generated numbers: %.2f and %.2f\n", a, b)
-	fmt.Printf("Addition: %.2f\n", a+b)
-	fmt.Printf("Subtraction: %.2f\n", a-b)
-	fmt.Printf("Multiplication: %.2f\n", a*b)
-	fmt.Printf("Division: %.2f\n", a/b)
-	fmt.Printf("Square root of first number: %.2f\n", math.Sqrt(a))
-	fmt.Printf("Power (first to the second): %.2f\n", math.Pow(a, b))
-	fmt.Printf("Sine of first number: %.2f\n", math.Sin(a))
-	fmt.Printf("Cosine of first number: %.2f\n", math.Cos(a))
-	fmt.Printf("Tangent of first number: %.2f\n", math.Tan(a))
-	fmt.Printf("Logarithm (base 10) of first number: %.2f\n", math.Log10(a))
-	fmt.Printf("Natural logarithm of first number: %.2f\n", math.Log(a))
-	fmt.Printf("Absolute value of subtraction: %.2f\n", math.Abs(a-b))
-	fmt.Printf("Ceiling of first number: %.2f\n", math.Ceil(a))
-	fmt.Printf("Floor of first number: %.2f\n", math.Floor(a))
-	fmt.Printf("Round of first number: %.2f\n", math.Round(a))
-	fmt.Printf("Maximum of the two numbers: %.2f\n", math.Max(a, b))
-	fmt.Printf("Minimum of the two numbers: %.2f\n", math.Min(a, b))
-	fmt.Printf("Exponential of first number: %.2f\n", math.Exp(a))
-	fmt.Printf("Modulo (remainder of division): %.2f\n", math.Mod(a, b))
-	fmt.Printf("Hyperbolic sine of first number: %.2f\n", math.Sinh(a))
-	fmt.Printf("Hyperbolic cosine of first number: %.2f\n", math.Cosh(a))
-	fmt.Printf("Hyperbolic tangent of first number: %.2f\n", math.Tanh(a))
+	fmt.Printf("Generated numbers: %d and %d\n", a, b)
+	fmt.Printf("Addition: %d + %d = %d\n", a, b, a+b)
+	fmt.Printf("Subtraction: %d - %d = %d\n", a, b, a-b)
+	fmt.Printf("Multiplication: %d * %d = %d\n", a, b, a*b)
+	if b != 0 {
+		fmt.Printf("Division: %d / %d = %.2f\n", a, b, float64(a)/float64(b))
+	} else {
+		fmt.Println("Division by zero is undefined")
+	}
+	fmt.Printf("Modulus: %d %% %d = %d\n", a, b, a%b)
+	fmt.Printf("Power: %d^%d = %.2f\n", a, b, math.Pow(float64(a), float64(b)))
+	fmt.Printf("Square root of %d: %.2f\n", a, math.Sqrt(float64(a)))
+	fmt.Printf("Square root of %d: %.2f\n", b, math.Sqrt(float64(b)))
+	fmt.Printf("Logarithm of %d: %.2f\n", a, math.Log(float64(a)))
+	fmt.Printf("Logarithm of %d: %.2f\n", b, math.Log(float64(b)))
+
+	// Generate and print a random number between 0 and 1
+	fmt.Printf("Random number between 0 and 1: %.2f\n", rand.Float64())
+
+	// Calculate and print the factorial of a
+	factorial := 1
+	for i := 1; i <= a; i++ {
+		factorial *= i
+	}
+	fmt.Printf("Factorial of %d: %d\n", a, factorial)
+
+	// Check if a is prime
+	isPrime := true
+	if a < 2 {
+		isPrime = false
+	} else {
+		for i := 2; i <= int(math.Sqrt(float64(a))); i++ {
+			if a%i == 0 {
+				isPrime = false
+				break
+			}
+		}
+	}
+	fmt.Printf("Is %d a prime number? %t\n", a, isPrime)
+
+	// Generate a random string
+	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	randomString := make([]rune, 10)
+	for i := range randomString {
+		randomString[i] = letters[rand.Intn(len(letters))]
+	}
+	fmt.Printf("Random string: %s\n", string(randomString))
+
+	// Infinite loop to keep the program running (simulate a long program)
+	for {
+		fmt.Println("Program is running... Press CTRL+C to exit.")
+		time.Sleep(10 * time.Second)
+	}
 }
