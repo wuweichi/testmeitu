@@ -30,7 +30,7 @@ func main() {
 		} else if guess > target {
 			fmt.Println("Too high! Try again.")
 		} else {
-			fmt.Printf("Congratulations! You guessed the number in %d attempts!\n", attempts)
+			fmt.Printf("Congratulations! You've guessed the number in %d attempts!\n", attempts)
 			break
 		}
 	}
