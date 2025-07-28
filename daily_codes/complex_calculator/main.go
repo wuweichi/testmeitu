@@ -3,70 +3,89 @@ package main
 import (
 	"fmt"
 	"math"
-	"math/rand"
-	"time"
+	"os"
+	"strconv"
 )
 
+func add(a, b float64) float64 {
+	return a + b
+}
+
+func subtract(a, b float64) float64 {
+	return a - b
+}
+
+func multiply(a, b float64) float64 {
+	return a * b
+}
+
+func divide(a, b float64) (float64, error) {
+	if b == 0 {
+		return 0, fmt.Errorf("cannot divide by zero")
+	}
+	return a / b, nil
+}
+
+func power(a, b float64) float64 {
+	return math.Pow(a, b)
+}
+
+func sqrt(a float64) (float64, error) {
+	if a < 0 {
+		return 0, fmt.Errorf("cannot take square root of negative number")
+	}
+	return math.Sqrt(a), nil
+}
+
 func main() {
-	// Seed the random number generator
-	rand.Seed(time.Now().UnixNano())
-
-	// Generate two random numbers
-	a := rand.Intn(100)
-	b := rand.Intn(100)
-
-	// Perform and print various mathematical operations
-	fmt.Printf("Generated numbers: %d and %d\n", a, b)
-	fmt.Printf("Addition: %d + %d = %d\n", a, b, a+b)
-	fmt.Printf("Subtraction: %d - %d = %d\n", a, b, a-b)
-	fmt.Printf("Multiplication: %d * %d = %d\n", a, b, a*b)
-	if b != 0 {
-		fmt.Printf("Division: %d / %d = %.2f\n", a, b, float64(a)/float64(b))
-	} else {
-		fmt.Println("Division by zero is undefined")
+	if len(os.Args) < 4 {
+		fmt.Println("Usage: calculator <operation> <operand1> <operand2>")
+		fmt.Println("Operations: add, subtract, multiply, divide, power, sqrt")
+		return
 	}
-	fmt.Printf("Modulus: %d %% %d = %d\n", a, b, a%b)
-	fmt.Printf("Power: %d^%d = %.2f\n", a, b, math.Pow(float64(a), float64(b)))
-	fmt.Printf("Square root of %d: %.2f\n", a, math.Sqrt(float64(a)))
-	fmt.Printf("Square root of %d: %.2f\n", b, math.Sqrt(float64(b)))
-	fmt.Printf("Logarithm of %d: %.2f\n", a, math.Log(float64(a)))
-	fmt.Printf("Logarithm of %d: %.2f\n", b, math.Log(float64(b)))
 
-	// Generate and print a random number between 0 and 1
-	fmt.Printf("Random number between 0 and 1: %.2f\n", rand.Float64())
-
-	// Calculate and print the factorial of a
-	factorial := 1
-	for i := 1; i <= a; i++ {
-		factorial *= i
+	operation := os.Args[1]
+	operand1, err := strconv.ParseFloat(os.Args[2], 64)
+	if err != nil {
+		fmt.Println("Invalid operand1")
+		return
 	}
-	fmt.Printf("Factorial of %d: %d\n", a, factorial)
 
-	// Check if a is prime
-	isPrime := true
-	if a < 2 {
-		isPrime = false
-	} else {
-		for i := 2; i <= int(math.Sqrt(float64(a))); i++ {
-			if a%i == 0 {
-				isPrime = false
-				break
-			}
+	var operand2 float64
+	if operation != "sqrt" {
+		operand2, err = strconv.ParseFloat(os.Args[3], 64)
+		if err != nil {
+			fmt.Println("Invalid operand2")
+			return
 		}
 	}
-	fmt.Printf("Is %d a prime number? %t\n", a, isPrime)
 
-	// Generate a random string
-	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	randomString := make([]rune, 10)
-	for i := range randomString {
-		randomString[i] = letters[rand.Intn(len(letters))]
+	var result float64
+	switch operation {
+	case "add":
+		result = add(operand1, operand2)
+	case "subtract":
+		result = subtract(operand1, operand2)
+	case "multiply":
+		result = multiply(operand1, operand2)
+	case "divide":
+		result, err = divide(operand1, operand2)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+	case "power":
+		result = power(operand1, operand2)
+	case "sqrt":
+		result, err = sqrt(operand1)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+	default:
+		fmt.Println("Invalid operation")
+		return
 	}
-	fmt.Printf("Random string: %s\n", string(randomString))
 
-	// Infinite loop to keep the program running (simulate a long program)
-	for {
-		fmt.Println("Program is running... Press CTRL+C to exit.")
-		time.Sleep(10 * time.Second)
-	}
+	fmt.Printf("Result: %v\n", result)
 }
