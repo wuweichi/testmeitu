@@ -13,7 +13,7 @@ func main() {
 	// Generate a random number between 1 and 100
 	target := rand.Intn(100) + 1
 
-	fmt.Println("I've chosen a random number between 1 and 100. Can you guess it?")
+	fmt.Println("I've picked a random number between 1 and 100. Can you guess it?")
 
 	var guess int
 	attempts := 0
