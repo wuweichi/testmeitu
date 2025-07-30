@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	fmt.Println("Welcome to the Number Guessing Game!")
+	fmt.Println("Welcome to the Fun Number Guessing Game!")
 	fmt.Println("I'm thinking of a number between 1 and 100. Can you guess it?")
 
 	rand.Seed(time.Now().UnixNano())
