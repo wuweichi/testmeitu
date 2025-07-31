@@ -3,89 +3,41 @@ package main
 import (
 	"fmt"
 	"math"
-	"os"
-	"strconv"
+	"math/rand"
+	"time"
 )
 
-func add(a, b float64) float64 {
-	return a + b
-}
-
-func subtract(a, b float64) float64 {
-	return a - b
-}
-
-func multiply(a, b float64) float64 {
-	return a * b
-}
-
-func divide(a, b float64) (float64, error) {
-	if b == 0 {
-		return 0, fmt.Errorf("cannot divide by zero")
+func generateRandomNumbers(count int) []float64 {
+	rand.Seed(time.Now().UnixNano())
+	numbers := make([]float64, count)
+	for i := 0; i < count; i++ {
+		numbers[i] = rand.Float64() * 100
 	}
-	return a / b, nil
+	return numbers
 }
 
-func power(a, b float64) float64 {
-	return math.Pow(a, b)
-}
-
-func sqrt(a float64) (float64, error) {
-	if a < 0 {
-		return 0, fmt.Errorf("cannot take square root of negative number")
+func calculateAverage(numbers []float64) float64 {
+	sum := 0.0
+	for _, number := range numbers {
+		sum += number
 	}
-	return math.Sqrt(a), nil
+	return sum / float64(len(numbers))
+}
+
+func calculateStandardDeviation(numbers []float64, average float64) float64 {
+	sum := 0.0
+	for _, number := range numbers {
+		sum += math.Pow(number-average, 2)
+	}
+	return math.Sqrt(sum / float64(len(numbers)))
 }
 
 func main() {
-	if len(os.Args) < 4 {
-		fmt.Println("Usage: calculator <operation> <operand1> <operand2>")
-		fmt.Println("Operations: add, subtract, multiply, divide, power, sqrt")
-		return
-	}
+	numbers := generateRandomNumbers(1000)
+	average := calculateAverage(numbers)
+	standardDeviation := calculateStandardDeviation(numbers, average)
 
-	operation := os.Args[1]
-	operand1, err := strconv.ParseFloat(os.Args[2], 64)
-	if err != nil {
-		fmt.Println("Invalid operand1")
-		return
-	}
-
-	var operand2 float64
-	if operation != "sqrt" {
-		operand2, err = strconv.ParseFloat(os.Args[3], 64)
-		if err != nil {
-			fmt.Println("Invalid operand2")
-			return
-		}
-	}
-
-	var result float64
-	switch operation {
-	case "add":
-		result = add(operand1, operand2)
-	case "subtract":
-		result = subtract(operand1, operand2)
-	case "multiply":
-		result = multiply(operand1, operand2)
-	case "divide":
-		result, err = divide(operand1, operand2)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-	case "power":
-		result = power(operand1, operand2)
-	case "sqrt":
-		result, err = sqrt(operand1)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-	default:
-		fmt.Println("Invalid operation")
-		return
-	}
-
-	fmt.Printf("Result: %v\n", result)
+	fmt.Printf("Generated %d random numbers\n", len(numbers))
+	fmt.Printf("Average: %.2f\n", average)
+	fmt.Printf("Standard Deviation: %.2f\n", standardDeviation)
 }
