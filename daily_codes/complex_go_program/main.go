@@ -6,14 +6,35 @@ import (
 	"time"
 )
 
-func generateRandomNumber() int {
-	rand.Seed(time.Now().UnixNano()
-	return rand.Intn(100)
-}
-
 func main() {
-	for i := 0; i < 1000; i++ {
-		randomNumber := generateRandomNumber()
-		fmt.Printf("Random number %d: %d\n", i+1, randomNumber)
+	// Seed the random number generator
+	rand.Seed(time.Now().UnixNano())
+
+	// Generate a random number between 1 and 100
+	target := rand.Intn(100) + 1
+
+	fmt.Println("I've chosen a random number between 1 and 100.")
+	fmt.Println("Can you guess it?")
+
+	var guess int
+	attempts := 0
+
+	for {
+		fmt.Print("Enter your guess: ")
+		_, err := fmt.Scanf("%d", &guess)
+		if err != nil {
+			fmt.Println("Please enter a valid number!")
+			continue
+		}
+		attempts++
+
+		if guess < target {
+			fmt.Println("Too low! Try again.")
+		} else if guess > target {
+			fmt.Println("Too high! Try again.")
+		} else {
+			fmt.Printf("Congratulations! You've guessed the number in %d attempts!\n", attempts)
+			break
+		}
 	}
 }
