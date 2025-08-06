@@ -6,21 +6,21 @@ import (
 	"time"
 )
 
-func main() {
-	quotes := []string{
-		"The only limit to our realization of tomorrow is our doubts of today. - Franklin D. Roosevelt",
-		"Life is what happens when you're busy making other plans. - John Lennon",
-		"The way to get started is to quit talking and begin doing. - Walt Disney",
-		"Your time is limited, don't waste it living someone else's life. - Steve Jobs",
-		"Don't watch the clock; do what it does. Keep going. - Sam Levenson",
-		"The future belongs to those who believe in the beauty of their dreams. - Eleanor Roosevelt",
-		"It's not whether you get knocked down, it's whether you get up. - Vince Lombardi",
-		"If you can dream it, you can do it. - Walt Disney",
-		"The best way to predict the future is to invent it. - Alan Kay",
-		"Strive not to be a success, but rather to be of value. - Albert Einstein",
-	}
+var quotes = []string{
+	"The only limit to our realization of tomorrow is our doubts of today. - Franklin D. Roosevelt",
+	"Life is what happens when you're busy making other plans. - John Lennon",
+	"The way to get started is to quit talking and begin doing. - Walt Disney",
+	"The future belongs to those who believe in the beauty of their dreams. - Eleanor Roosevelt",
+	"It is during our darkest moments that we must focus to see the light. - Aristotle",
+	"Do not go where the path may lead, go instead where there is no path and leave a trail. - Ralph Waldo Emerson",
+	"You will face many defeats in life, but never let yourself be defeated. - Maya Angelou",
+	"The greatest glory in living lies not in never falling, but in rising every time we fall. - Nelson Mandela",
+	"In the end, it's not the years in your life that count. It's the life in your years. - Abraham Lincoln",
+	"Never let the fear of striking out keep you from playing the game. - Babe Ruth",
+}
 
+func main() {
 	rand.Seed(time.Now().UnixNano())
-	randomIndex := rand.Intn(len(quotes))
-	fmt.Println(quotes[randomIndex])
+	quote := quotes[rand.Intn(len(quotes))]
+	fmt.Println(quote)
 }
