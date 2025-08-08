@@ -6,35 +6,21 @@ import (
 	"time"
 )
 
-func main() {
-	// Seed the random number generator
-	rand.Seed(time.Now().UnixNano())
-
-	// Generate a random number between 1 and 100
-	target := rand.Intn(100) + 1
-
-	fmt.Println("I've chosen a random number between 1 and 100.")
-	fmt.Println("Can you guess it?")
-
-	var guess int
-	attempts := 0
-
-	for {
-		fmt.Print("Enter your guess: ")
-		_, err := fmt.Scanf("%d", &guess)
-		if err != nil {
-			fmt.Println("Please enter a valid number!")
-			continue
-		}
-		attempts++
-
-		if guess < target {
-			fmt.Println("Too low! Try again.")
-		} else if guess > target {
-			fmt.Println("Too high! Try again.")
-		} else {
-			fmt.Printf("Congratulations! You've guessed the number in %d attempts!\n", attempts)
-			break
-		}
+func generateRandomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	var seededRand *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[seededRand.Intn(len(charset))]
 	}
+	return string(b)
+}
+
+func main() {
+	fmt.Println("Generating a complex program...")
+	for i := 0; i < 1000; i++ {
+		randomString := generateRandomString(10)
+		fmt.Printf("Iteration %d: %s\n", i, randomString)
+	}
+	fmt.Println("Program completed successfully!")
 }
