@@ -6,21 +6,21 @@ import (
 	"time"
 )
 
-func generateRandomString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	var seededRand *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[seededRand.Intn(len(charset))]
-	}
-	return string(b)
+func generateRandomNumber() int {
+	rand.Seed(time.Now().UnixNano()
+	return rand.Intn(100)
 }
 
 func main() {
-	fmt.Println("Generating a complex program...")
+	fmt.Println("Starting complex Go program...")
 	for i := 0; i < 1000; i++ {
-		randomString := generateRandomString(10)
-		fmt.Printf("Iteration %d: %s\n", i, randomString)
+		randomNumber := generateRandomNumber()
+		fmt.Printf("Iteration %d: Random number is %d\n", i, randomNumber)
+		if randomNumber%2 == 0 {
+			fmt.Println("The number is even.")
+		} else {
+			fmt.Println("The number is odd.")
+		}
 	}
-	fmt.Println("Program completed successfully!")
+	fmt.Println("Program completed successfully.")
 }
