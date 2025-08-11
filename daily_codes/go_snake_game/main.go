@@ -2,9 +2,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/nsf/termbox-go"
 	"math/rand"
-	"os"
-	"os/exec"
 	"time"
 )
 
@@ -19,129 +18,104 @@ type Snake struct {
 }
 
 type Game struct {
-	Snake    Snake
-	Food     Point
-	Score    int
-	GameOver bool
-	Width    int
-	Height   int
+	Snake Snake
+	Food  Point
+	Score int
+	Over  bool
 }
 
 func (g *Game) Init() {
-	g.Width = 20
-	g.Height = 20
+	termbox.Init()
+	width, height := termbox.Size()
 	g.Snake = Snake{
-		Body: []Point{{X: g.Width / 2, Y: g.Height / 2}},
-		Dir:  Point{X: 0, Y: 1},
-		Speed: 200 * time.Millisecond,
+		Body:  []Point{{width / 2, height / 2}},
+		Dir:   Point{1, 0},
+		Speed: 100 * time.Millisecond,
 	}
+	g.SpawnFood()
 	g.Score = 0
-	g.GameOver = false
-	g.placeFood()
+	g.Over = false
 }
 
-func (g *Game) placeFood() {
-	for {
-		g.Food = Point{
-			X: rand.Intn(g.Width),
-			Y: rand.Intn(g.Height),
-		}
-		if !g.isPointOnSnake(g.Food) {
-			break
-		}
-	}
+func (g *Game) SpawnFood() {
+	width, height := termbox.Size()
+	g.Food = Point{rand.Intn(width-2) + 1, rand.Intn(height-2) + 1}
 }
 
-func (g *Game) isPointOnSnake(p Point) bool {
-	for _, b := range g.Snake.Body {
-		if b == p {
-			return true
-		}
+func (g *Game) Draw() {
+	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+	for _, p := range g.Snake.Body {
+		termbox.SetCell(p.X, p.Y, 'O', termbox.ColorGreen, termbox.ColorDefault)
 	}
-	return false
+	termbox.SetCell(g.Food.X, g.Food.Y, '@', termbox.ColorRed, termbox.ColorDefault)
+	termbox.Flush()
 }
 
 func (g *Game) Update() {
-	if g.GameOver {
-		return
-	}
-
 	head := g.Snake.Body[0]
-	newHead := Point{X: head.X + g.Snake.Dir.X, Y: head.Y + g.Snake.Dir.Y}
-
-	if newHead.X < 0 || newHead.X >= g.Width || newHead.Y < 0 || newHead.Y >= g.Height {
-		g.GameOver = true
+	newHead := Point{head.X + g.Snake.Dir.X, head.Y + g.Snake.Dir.Y}
+	if newHead.X <= 0 || newHead.X >= termbox.Size().X-1 || newHead.Y <= 0 || newHead.Y >= termbox.Size().Y-1 {
+		g.Over = true
 		return
 	}
-
-	for _, b := range g.Snake.Body[1:] {
-		if b == newHead {
-			g.GameOver = true
+	for _, p := range g.Snake.Body {
+		if p == newHead {
+			g.Over = true
 			return
 		}
 	}
-
 	g.Snake.Body = append([]Point{newHead}, g.Snake.Body...)
-
 	if newHead == g.Food {
 		g.Score++
-		g.placeFood()
+		g.SpawnFood()
 	} else {
 		g.Snake.Body = g.Snake.Body[:len(g.Snake.Body)-1]
 	}
 }
 
-func (g *Game) Draw() {
-	cmd := exec.Command("clear")
-	cmd.Stdout = os.Stdout
-	cmd.Run()
-
-	for y := 0; y < g.Height; y++ {
-		for x := 0; x < g.Width; x++ {
-			p := Point{X: x, Y: y}
-			if p == g.Food {
-				fmt.Print("F")
-			} else if g.isPointOnSnake(p) {
-				fmt.Print("S")
-			} else {
-				fmt.Print(".")
+func (g *Game) HandleInput() {
+	switch ev := termbox.PollEvent(); ev.Type {
+	case termbox.EventKey:
+		switch ev.Key {
+		case termbox.KeyArrowUp:
+			if g.Snake.Dir.Y == 0 {
+				g.Snake.Dir = Point{0, -1}
 			}
-			fmt.Print(" ")
+		case termbox.KeyArrowDown:
+			if g.Snake.Dir.Y == 0 {
+				g.Snake.Dir = Point{0, 1}
+			}
+		case termbox.KeyArrowLeft:
+			if g.Snake.Dir.X == 0 {
+				g.Snake.Dir = Point{-1, 0}
+			}
+		case termbox.KeyArrowRight:
+			if g.Snake.Dir.X == 0 {
+				g.Snake.Dir = Point{1, 0}
+			}
+		case termbox.KeyEsc:
+			g.Over = true
 		}
-		fmt.Println()
 	}
-	fmt.Printf("Score: %d\n", g.Score)
 }
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
 	game := Game{}
 	game.Init()
+	defer termbox.Close()
 
 	go func() {
-		for {
-			var input string
-			fmt.Scanln(&input)
-			switch input {
-			case "w":
-				game.Snake.Dir = Point{X: 0, Y: -1}
-			case "s":
-				game.Snake.Dir = Point{X: 0, Y: 1}
-			case "a":
-				game.Snake.Dir = Point{X: -1, Y: 0}
-			case "d":
-				game.Snake.Dir = Point{X: 1, Y: 0}
-			}
+		for !game.Over {
+			game.HandleInput()
 		}
 	}()
 
-	for {
-		game.Draw()
+	for !game.Over {
 		game.Update()
+		game.Draw()
 		time.Sleep(game.Snake.Speed)
-		if game.GameOver {
-			fmt.Println("Game Over!")
-			break
-		}
 	}
+
+	fmt.Printf("Game Over! Your score: %d\n", game.Score)
 }
