@@ -7,20 +7,13 @@ import (
 )
 
 func generateRandomNumber() int {
-	rand.Seed(time.Now().UnixNano()
 	return rand.Intn(100)
 }
 
 func main() {
-	fmt.Println("Starting complex Go program...")
+	rand.Seed(time.Now().UnixNano())
 	for i := 0; i < 1000; i++ {
-		randomNumber := generateRandomNumber()
-		fmt.Printf("Iteration %d: Random number is %d\n", i, randomNumber)
-		if randomNumber%2 == 0 {
-			fmt.Println("The number is even.")
-		} else {
-			fmt.Println("The number is odd.")
-		}
+		num := generateRandomNumber()
+		fmt.Printf("Random number %d: %d\n", i+1, num)
 	}
-	fmt.Println("Program completed successfully.")
 }
