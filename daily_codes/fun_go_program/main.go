@@ -8,16 +8,13 @@ import (
 
 func main() {
 	fmt.Println("Welcome to the Fun Go Program!")
-	fmt.Println("This program generates random numbers and checks if they're prime.")
+	fmt.Println("This program generates random numbers and checks if they are prime.")
 
 	rand.Seed(time.Now().UnixNano())
+
 	for i := 0; i < 10; i++ {
-		n := rand.Intn(100) + 1
-		if isPrime(n) {
-			fmt.Printf("%d is a prime number.\n", n)
-		} else {
-			fmt.Printf("%d is not a prime number.\n", n)
-		}
+		number := rand.Intn(100) + 1
+		fmt.Printf("Number: %d, Is Prime: %v\n", number, isPrime(number))
 	}
 }
 
@@ -25,7 +22,13 @@ func isPrime(n int) bool {
 	if n <= 1 {
 		return false
 	}
-	for i := 2; i*i <= n; i++ {
+	if n == 2 {
+		return true
+	}
+	if n%2 == 0 {
+		return false
+	}
+	for i := 3; i*i <= n; i += 2 {
 		if n%i == 0 {
 			return false
 		}
