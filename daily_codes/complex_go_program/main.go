@@ -7,13 +7,15 @@ import (
 )
 
 func generateRandomNumber() int {
+	rand.Seed(time.Now().UnixNano())
 	return rand.Intn(100)
 }
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
+	fmt.Println("Starting complex Go program...")
 	for i := 0; i < 1000; i++ {
-		num := generateRandomNumber()
-		fmt.Printf("Random number %d: %d\n", i+1, num)
+		randomNum := generateRandomNumber()
+		fmt.Printf("Iteration %d: Random number is %d\n", i+1, randomNum)
 	}
+	fmt.Println("Program completed successfully.")
 }
