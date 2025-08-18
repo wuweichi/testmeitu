@@ -3,44 +3,39 @@ package main
 import (
 	"fmt"
 	"time"
-	"github.com/faiface/beep"
-	"github.com/faiface/beep/mp3"
-	"github.com/faiface/beep/speaker"
+	"math/rand"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
-func playSound() {
-	f, err := os.Open("alarm.mp3")
-	if err != nil {
-		fmt.Println("Could not open the file", err)
-		return
-	}
-	streamer, format, err := mp3.Decode(f)
-	if err != nil {
-		fmt.Println("Could not decode the file", err)
-		return
-	}
-	defer streamer.Close()
-	speaker.Init(format.SampleRate, format.SampleRate.N(time.Second/10))
-	done := make(chan bool)
-	speaker.Play(beep.Seq(streamer, beep.Callback(func() {
-		done <- true
-	})))
-	<-done
-}
+func main() {
+	// Seed the random number generator
+	rand.Seed(time.Now().UnixNano())
 
-func displayTime() {
+	// Channel to listen for interrupt signals
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
+
+	// Infinite loop to keep the clock running
 	for {
-		now := time.Now()
-		fmt.Printf("\r%02d:%02d:%02d", now.Hour(), now.Minute(), now.Second())
-		time.Sleep(1 * time.Second)
-		if now.Second() == 0 {
-			go playSound()
+		select {
+		case <-time.After(1 * time.Second):
+			// Get the current time
+			now := time.Now()
+			hour, min, sec := now.Hour(), now.Minute(), now.Second()
+
+			// Generate a random color for the clock display
+			color := fmt.Sprintf("\033[38;5;%dm", rand.Intn(256))
+			reset := "\033[0m"
+
+			// Display the time with the random color
+			fmt.Printf("%s%02d:%02d:%02d%s\n", color, hour, min, sec, reset)
+
+		case <-interrupt:
+			// Handle interrupt signal
+			fmt.Println("\nClock stopped.")
+			return
 		}
 	}
-}
-
-func main() {
-	fmt.Println("Starting the complex clock...")
-	displayTime()
 }
