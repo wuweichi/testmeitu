@@ -10,220 +10,306 @@ import (
 	"time"
 )
 
-// GameState holds the state of the game
-type GameState struct {
-	PlayerName  string
-	Score       int
-	Level       int
-	Inventory   []string
-	IsGameOver  bool
+// Player struct to hold player information
+type Player struct {
+	Name     string
+	Score    int
+	Health   int
+	Inventory []string
 }
 
-// Item represents an item in the game
-type Item struct {
+// GameState struct to manage the game state
+type GameState struct {
+	Player      Player
+	CurrentRoom string
+	Rooms       map[string]Room
+	Quests      []Quest
+	Enemies     []Enemy
+}
+
+// Room struct to define a room in the game
+type Room struct {
 	Name        string
 	Description string
-	Value       int
+	Exits       map[string]string
+	Items       []string
+	Enemy       *Enemy
 }
 
-// Enemy represents an enemy in the game
-type Enemy struct {
+// Quest struct to define a quest
+type Quest struct {
+	ID          int
 	Name        string
-	Health      int
-	AttackPower int
+	Description string
+	Completed   bool
+}
+
+// Enemy struct to define an enemy
+type Enemy struct {
+	Name   string
+	Health int
+	Damage int
 }
 
 // Function to initialize the game
-func initializeGame() GameState {
+func initGame() GameState {
+	player := Player{
+		Name:     "",
+		Score:    0,
+		Health:   100,
+		Inventory: []string{},
+	}
+
+	rooms := map[string]Room{
+		"start": {
+			Name:        "Start Room",
+			Description: "You are in a dimly lit room with a single door to the north.",
+			Exits:       map[string]string{"north": "hallway"},
+			Items:       []string{"key"},
+			Enemy:       nil,
+		},
+		"hallway": {
+			Name:        "Hallway",
+			Description: "A long hallway stretches east and west. There is a door to the south.",
+			Exits:       map[string]string{"south": "start", "east": "treasure", "west": "enemy"},
+			Items:       []string{},
+			Enemy:       nil,
+		},
+		"treasure": {
+			Name:        "Treasure Room",
+			Description: "You found a room filled with gold and jewels! But be careful, there might be traps.",
+			Exits:       map[string]string{"west": "hallway"},
+			Items:       []string{"gold", "potion"},
+			Enemy:       nil,
+		},
+		"enemy": {
+			Name:        "Enemy Room",
+			Description: "A fierce goblin blocks your path! Prepare for battle.",
+			Exits:       map[string]string{"east": "hallway"},
+			Items:       []string{},
+			Enemy:       &Enemy{Name: "Goblin", Health: 30, Damage: 10},
+		},
+	}
+
+	quests := []Quest{
+		{ID: 1, Name: "Find the Key", Description: "Locate the key in the start room.", Completed: false},
+		{ID: 2, Name: "Defeat the Goblin", Description: "Defeat the goblin in the enemy room.", Completed: false},
+		{ID: 3, Name: "Collect Treasure", Description: "Gather gold from the treasure room.", Completed: false},
+	}
+
+	enemies := []Enemy{
+		{Name: "Goblin", Health: 30, Damage: 10},
+	}
+
+	return GameState{
+		Player:      player,
+		CurrentRoom: "start",
+		Rooms:       rooms,
+		Quests:      quests,
+		Enemies:     enemies,
+	}
+}
+
+// Function to print the current room description
+func printRoomDescription(gs *GameState) {
+	room := gs.Rooms[gs.CurrentRoom]
+	fmt.Printf("You are in the %s. %s\n", room.Name, room.Description)
+	if len(room.Items) > 0 {
+		fmt.Printf("Items here: %s\n", strings.Join(room.Items, ", "))
+	}
+	if room.Enemy != nil {
+		fmt.Printf("An enemy is here: %s (Health: %d)\n", room.Enemy.Name, room.Enemy.Health)
+	}
+	fmt.Printf("Exits: %s\n", getExitsString(room.Exits))
+}
+
+// Helper function to get exits as a string
+func getExitsString(exits map[string]string) string {
+	keys := make([]string, 0, len(exits))
+	for k := range exits {
+		keys = append(keys, k)
+	}
+	return strings.Join(keys, ", ")
+}
+
+// Function to handle player movement
+func movePlayer(gs *GameState, direction string) {
+	room := gs.Rooms[gs.CurrentRoom]
+	if exit, ok := room.Exits[direction]; ok {
+		gs.CurrentRoom = exit
+		fmt.Printf("You move %s to the %s.\n", direction, gs.Rooms[exit].Name)
+	} else {
+		fmt.Println("You can't go that way.")
+	}
+}
+
+// Function to handle taking items
+func takeItem(gs *GameState, item string) {
+	room := gs.Rooms[gs.CurrentRoom]
+	for i, it := range room.Items {
+		if it == item {
+			gs.Player.Inventory = append(gs.Player.Inventory, item)
+			room.Items = append(room.Items[:i], room.Items[i+1:]...)
+			gs.Rooms[gs.CurrentRoom] = room // Update the room in the map
+			fmt.Printf("You took the %s.\n", item)
+			updateQuests(gs, item)
+			return
+		}
+	}
+	fmt.Println("Item not found here.")
+}
+
+// Function to update quests based on actions
+func updateQuests(gs *GameState, action string) {
+	for i := range gs.Quests {
+		if !gs.Quests[i].Completed {
+			switch gs.Quests[i].Name {
+			case "Find the Key":
+				if action == "key" {
+					gs.Quests[i].Completed = true
+					gs.Player.Score += 10
+					fmt.Println("Quest completed: Find the Key! +10 points.")
+				}
+			case "Collect Treasure":
+				if action == "gold" {
+					gs.Quests[i].Completed = true
+					gs.Player.Score += 20
+					fmt.Println("Quest completed: Collect Treasure! +20 points.")
+				}
+			}
+		}
+	}
+}
+
+// Function to handle combat with an enemy
+func combat(gs *GameState) {
+	room := gs.Rooms[gs.CurrentRoom]
+	if room.Enemy == nil {
+		fmt.Println("No enemy here to fight.")
+		return
+	}
+	enemy := room.Enemy
+	fmt.Printf("Combat with %s!\n", enemy.Name)
+	for enemy.Health > 0 && gs.Player.Health > 0 {
+		// Player attacks
+		damage := rand.Intn(15) + 5 // Random damage between 5 and 20
+		enemy.Health -= damage
+		fmt.Printf("You attack the %s for %d damage. Enemy health: %d\n", enemy.Name, damage, enemy.Health)
+		if enemy.Health <= 0 {
+			fmt.Printf("You defeated the %s!\n", enemy.Name)
+			gs.Player.Score += 15
+			room.Enemy = nil
+			gs.Rooms[gs.CurrentRoom] = room // Update the room
+			updateQuestCombat(gs, enemy.Name)
+			break
+		}
+		// Enemy attacks
+		enemyDamage := rand.Intn(enemy.Damage) + 1
+		gs.Player.Health -= enemyDamage
+		fmt.Printf("%s attacks you for %d damage. Your health: %d\n", enemy.Name, enemyDamage, gs.Player.Health)
+		if gs.Player.Health <= 0 {
+			fmt.Println("You have been defeated! Game over.")
+			os.Exit(0)
+		}
+		time.Sleep(1 * time.Second) // Pause for effect
+	}
+}
+
+// Function to update quest for combat
+func updateQuestCombat(gs *GameState, enemyName string) {
+	for i := range gs.Quests {
+		if gs.Quests[i].Name == "Defeat the Goblin" && enemyName == "Goblin" && !gs.Quests[i].Completed {
+			gs.Quests[i].Completed = true
+			fmt.Println("Quest completed: Defeat the Goblin! +15 points.")
+		}
+	}
+}
+
+// Function to display player status
+func showStatus(gs *GameState) {
+	fmt.Printf("Name: %s, Health: %d, Score: %d\n", gs.Player.Name, gs.Player.Health, gs.Player.Score)
+	fmt.Printf("Inventory: %s\n", strings.Join(gs.Player.Inventory, ", "))
+	fmt.Println("Active Quests:")
+	for _, quest := range gs.Quests {
+		if !quest.Completed {
+			fmt.Printf("- %s: %s\n", quest.Name, quest.Description)
+		}
+	}
+}
+
+// Function to handle using items
+func useItem(gs *GameState, item string) {
+	for i, it := range gs.Player.Inventory {
+		if it == item {
+			switch item {
+			case "potion":
+				gs.Player.Health += 20
+				fmt.Printf("You used a potion. Health restored by 20. Current health: %d\n", gs.Player.Health)
+				gs.Player.Inventory = append(gs.Player.Inventory[:i], gs.Player.Inventory[i+1:]...)
+				return
+			default:
+				fmt.Println("You can't use that item.")
+			}
+		}
+	}
+	fmt.Println("Item not in inventory.")
+}
+
+// Main function to run the game
+func main() {
+	rand.Seed(time.Now().UnixNano())
+	gs := initGame()
 	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Println("Welcome to the Text Adventure Game!")
 	fmt.Print("Enter your name: ")
 	name, _ := reader.ReadString('\n')
-	name = strings.TrimSpace(name)
-	return GameState{
-		PlayerName: name,
-		Score:      0,
-		Level:      1,
-		Inventory:  []string{"Sword", "Potion"},
-		IsGameOver: false,
-	}
-}
+	gs.Player.Name = strings.TrimSpace(name)
+	fmt.Printf("Hello, %s! Let's begin.\n", gs.Player.Name)
+	fmt.Println("Type 'help' for a list of commands.")
 
-// Function to display the main menu
-func displayMenu() {
-	fmt.Println("\n=== Main Menu ===")
-	fmt.Println("1. Start Game")
-	fmt.Println("2. View Inventory")
-	fmt.Println("3. View Score")
-	fmt.Println("4. Exit")
-	fmt.Print("Choose an option: ")
-}
-
-// Function to handle the game loop
-func gameLoop(state *GameState) {
-	reader := bufio.NewReader(os.Stdin)
-	for !state.IsGameOver {
-		fmt.Printf("\n=== Level %d ===\n", state.Level)
-		fmt.Println("You are in a dark forest. What do you want to do?")
-		fmt.Println("1. Explore")
-		fmt.Println("2. Rest")
-		fmt.Println("3. Check Inventory")
-		fmt.Println("4. Quit Game")
-		fmt.Print("Choose an option: ")
+	for {
+		printRoomDescription(&gs)
+		fmt.Print("> ")
 		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(input)
+		input = strings.TrimSpace(strings.ToLower(input))
+
 		switch input {
-		case "1":
-			explore(state)
-		case "2":
-			rest(state)
-		case "3":
-			viewInventory(state)
-		case "4":
-			state.IsGameOver = true
-			fmt.Println("Game over! Thanks for playing.")
+		case "help":
+			fmt.Println("Commands: go [direction], take [item], use [item], fight, status, quit")
+		case "quit":
+			fmt.Println("Thanks for playing!")
+			os.Exit(0)
+		case "status":
+			showStatus(&gs)
+		case "fight":
+			combat(&gs)
 		default:
-			fmt.Println("Invalid option. Try again.")
+			if strings.HasPrefix(input, "go ") {
+				direction := strings.TrimPrefix(input, "go ")
+				movePlayer(&gs, direction)
+			} else if strings.HasPrefix(input, "take ") {
+				item := strings.TrimPrefix(input, "take ")
+				takeItem(&gs, item)
+			} else if strings.HasPrefix(input, "use ") {
+				item := strings.TrimPrefix(input, "use ")
+				useItem(&gs, item)
+			} else {
+				fmt.Println("Unknown command. Type 'help' for options.")
+			}
 		}
-	}
-}
 
-// Function to handle exploration
-func explore(state *GameState) {
-	fmt.Println("You venture deeper into the forest...")
-	rand.Seed(time.Now().UnixNano())
-	event := rand.Intn(3)
-	switch event {
-	case 0:
-		fmt.Println("You found a treasure chest! +10 points.")
-		state.Score += 10
-		state.Inventory = append(state.Inventory, "Gold Coin")
-	case 1:
-		fmt.Println("You encountered a goblin!")
-		fightEnemy(state, Enemy{Name: "Goblin", Health: 20, AttackPower: 5})
-	case 2:
-		fmt.Println("You discovered a hidden path. Level up!")
-		state.Level++
-		state.Score += 5
-	}
-}
-
-// Function to handle resting
-func rest(state *GameState) {
-	fmt.Println("You take a rest and recover your strength.")
-	state.Score += 2
-}
-
-// Function to view inventory
-func viewInventory(state *GameState) {
-	fmt.Println("\n=== Inventory ===")
-	for _, item := range state.Inventory {
-		fmt.Printf("- %s\n", item)
-	}
-}
-
-// Function to handle enemy fights
-func fightEnemy(state *GameState, enemy Enemy) {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Printf("A %s appears with %d health.\n", enemy.Name, enemy.Health)
-	for enemy.Health > 0 && !state.IsGameOver {
-		fmt.Println("1. Attack")
-		fmt.Println("2. Use Item")
-		fmt.Println("3. Run Away")
-		fmt.Print("Choose an option: ")
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(input)
-		switch input {
-		case "1":
-			damage := rand.Intn(10) + 5 // Player attack between 5-14
-			fmt.Printf("You attack the %s for %d damage.\n", enemy.Name, damage)
-			enemy.Health -= damage
-			if enemy.Health <= 0 {
-				fmt.Printf("You defeated the %s! +15 points.\n", enemy.Name)
-				state.Score += 15
+		// Check if all quests are completed
+		allCompleted := true
+		for _, quest := range gs.Quests {
+			if !quest.Completed {
+				allCompleted = false
 				break
 			}
-			// Enemy counterattack
-			enemyDamage := rand.Intn(enemy.AttackPower) + 1
-			fmt.Printf("The %s attacks you for %d damage.\n", enemy.Name, enemyDamage)
-			// Simple health system: if score drops below 0, game over
-			state.Score -= enemyDamage
-			if state.Score < 0 {
-				state.IsGameOver = true
-				fmt.Println("You have been defeated! Game over.")
-			}
-		case "2":
-			useItem(state)
-		case "3":
-			fmt.Println("You run away safely.")
-			return
-		default:
-			fmt.Println("Invalid option. Try again.")
 		}
-	}
-}
-
-// Function to use an item from inventory
-func useItem(state *GameState) {
-	if len(state.Inventory) == 0 {
-		fmt.Println("Your inventory is empty!")
-		return
-	}
-	fmt.Println("Select an item to use:")
-	for i, item := range state.Inventory {
-		fmt.Printf("%d. %s\n", i+1, item)
-	}
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Enter item number: ")
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(input)
-	index, err := strconv.Atoi(input)
-	if err != nil || index < 1 || index > len(state.Inventory) {
-		fmt.Println("Invalid selection.")
-		return
-	}
-	item := state.Inventory[index-1]
-	if item == "Potion" {
-		fmt.Println("You used a Potion and gained 10 health.")
-		state.Score += 10
-		// Remove the used item
-		state.Inventory = append(state.Inventory[:index-1], state.Inventory[index:]...)
-	} else {
-		fmt.Printf("You can't use %s right now.\n", item)
-	}
-}
-
-// Function to save game state (placeholder)
-func saveGame(state GameState) {
-	fmt.Println("Game saved (not implemented).")
-}
-
-// Function to load game state (placeholder)
-func loadGame() GameState {
-	fmt.Println("Game loaded (not implemented).")
-	return GameState{}
-}
-
-// Main function
-func main() {
-	fmt.Println("Welcome to the Fun Text Adventure Game!")
-	gameState := initializeGame()
-	for {
-		displayMenu()
-		reader := bufio.NewReader(os.Stdin)
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(input)
-		switch input {
-		case "1":
-			gameLoop(&gameState)
-		case "2":
-			viewInventory(&gameState)
-		case "3":
-			fmt.Printf("Your score: %d\n", gameState.Score)
-		case "4":
-			fmt.Println("Exiting game. Goodbye!")
-			return
-		default:
-			fmt.Println("Invalid option. Try again.")
+		if allCompleted {
+			fmt.Println("Congratulations! You've completed all quests. Final score:", gs.Player.Score)
+			os.Exit(0)
 		}
 	}
 }
