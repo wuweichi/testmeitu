@@ -6,388 +6,233 @@ import (
 	"time"
 )
 
-type Player struct {
-	Name     string
-	Health   int
-	Mana     int
-	Strength int
-	Agility  int
-	Intellect int
-}
-
-type Enemy struct {
-	Name     string
-	Health   int
-	Damage   int
-	Defense  int
+type Character struct {
+	Name      string
+	Health    int
+	MaxHealth int
+	Attack    int
+	Defense   int
+	Level     int
+	Experience int
 }
 
 type Item struct {
 	Name        string
 	Description string
 	Value       int
-	Type        string
 }
 
-type GameWorld struct {
-	Players   []Player
-	Enemies   []Enemy
-	Items     []Item
-	Locations []string
+type GameState struct {
+	Player     Character
+	Inventory  []Item
+	GameTime   time.Duration
+	IsRunning  bool
 }
 
-func (p *Player) Attack(e *Enemy) int {
-	damage := p.Strength + rand.Intn(10)
-	e.Health -= damage
-	return damage
-}
-
-func (e *Enemy) Attack(p *Player) int {
-	damage := e.Damage - p.Agility/2
-	if damage < 0 {
-		damage = 0
+func (c *Character) TakeDamage(damage int) {
+	actualDamage := damage - c.Defense
+	if actualDamage < 0 {
+		actualDamage = 0
 	}
-	p.Health -= damage
-	return damage
-}
-
-func (p *Player) Heal() int {
-	if p.Mana >= 10 {
-		healAmount := p.Intellect + rand.Intn(5)
-		p.Health += healAmount
-		p.Mana -= 10
-		return healAmount
-	}
-	return 0
-}
-
-func (p *Player) UseItem(item Item) {
-	switch item.Type {
-	case "health":
-		p.Health += item.Value
-	case "mana":
-		p.Mana += item.Value
-	case "strength":
-		p.Strength += item.Value
+	c.Health -= actualDamage
+	if c.Health < 0 {
+		c.Health = 0
 	}
 }
 
-func generateRandomEnemy() Enemy {
-	names := []string{"Goblin", "Orc", "Dragon", "Skeleton", "Zombie"}
-	name := names[rand.Intn(len(names))]
-	health := rand.Intn(50) + 30
-	damage := rand.Intn(15) + 5
-	defense := rand.Intn(10) + 1
-	return Enemy{Name: name, Health: health, Damage: damage, Defense: defense}
-}
-
-func generateRandomItem() Item {
-	names := []string{"Health Potion", "Mana Potion", "Strength Elixir", "Magic Scroll", "Ancient Artifact"}
-	descriptions := []string{"Restores health", "Restores mana", "Increases strength", "Magical powers", "Ancient power"}
-	types := []string{"health", "mana", "strength", "magic", "artifact"}
-	idx := rand.Intn(len(names))
-	return Item{
-		Name:        names[idx],
-		Description: descriptions[idx],
-		Value:       rand.Intn(20) + 5,
-		Type:        types[idx],
+func (c *Character) Heal(amount int) {
+	c.Health += amount
+	if c.Health > c.MaxHealth {
+		c.Health = c.MaxHealth
 	}
 }
 
-func initializeGame() GameWorld {
-	player := Player{
-		Name:      "Hero",
+func (c *Character) GainExperience(exp int) {
+	c.Experience += exp
+	if c.Experience >= c.Level*100 {
+		c.LevelUp()
+	}
+}
+
+func (c *Character) LevelUp() {
+	c.Level++
+	c.MaxHealth += 10
+	c.Health = c.MaxHealth
+	c.Attack += 2
+	c.Defense += 1
+	c.Experience = 0
+}
+
+func NewCharacter(name string) Character {
+	return Character{
+		Name:      name,
 		Health:    100,
-		Mana:      50,
-		Strength:  15,
-		Agility:   10,
-		Intellect: 12,
-	}
-	
-	enemies := make([]Enemy, 5)
-	for i := 0; i < 5; i++ {
-		enemies[i] = generateRandomEnemy()
-	}
-	
-	items := make([]Item, 10)
-	for i := 0; i < 10; i++ {
-		items[i] = generateRandomItem()
-	}
-	
-	locations := []string{"Forest", "Cave", "Mountain", "Desert", "Castle"}
-	
-	return GameWorld{
-		Players:   []Player{player},
-		Enemies:   enemies,
-		Items:     items,
-		Locations: locations,
+		MaxHealth: 100,
+		Attack:    10,
+		Defense:   5,
+		Level:     1,
+		Experience: 0,
 	}
 }
 
-func battle(player *Player, enemy *Enemy) bool {
+func NewGameState() GameState {
+	return GameState{
+		Player:    NewCharacter("Hero"),
+		Inventory: []Item{},
+		GameTime:  0,
+		IsRunning: true,
+	}
+}
+
+func (gs *GameState) AddItem(item Item) {
+	gs.Inventory = append(gs.Inventory, item)
+}
+
+func (gs *GameState) RemoveItem(index int) {
+	if index >= 0 && index < len(gs.Inventory) {
+		gs.Inventory = append(gs.Inventory[:index], gs.Inventory[index+1:]...)
+	}
+}
+
+func (gs *GameState) PrintStatus() {
+	fmt.Printf("Player: %s\n", gs.Player.Name)
+	fmt.Printf("Health: %d/%d\n", gs.Player.Health, gs.Player.MaxHealth)
+	fmt.Printf("Level: %d\n", gs.Player.Level)
+	fmt.Printf("Experience: %d\n", gs.Player.Experience)
+	fmt.Printf("Attack: %d\n", gs.Player.Attack)
+	fmt.Printf("Defense: %d\n", gs.Player.Defense)
+	fmt.Printf("Game Time: %v\n", gs.GameTime)
+	fmt.Printf("Inventory: %d items\n", len(gs.Inventory))
+	for i, item := range gs.Inventory {
+		fmt.Printf("  %d. %s - %s (Value: %d)\n", i+1, item.Name, item.Description, item.Value)
+	}
+}
+
+func (gs *GameState) Battle(enemy Character) {
 	fmt.Printf("A wild %s appears!\n", enemy.Name)
-	for player.Health > 0 && enemy.Health > 0 {
-		fmt.Printf("Player Health: %d, Enemy Health: %d\n", player.Health, enemy.Health)
-		fmt.Println("Choose action: 1. Attack, 2. Heal, 3. Use Item")
-		var choice int
-		fmt.Scan(&choice)
-		switch choice {
-		case 1:
-			damage := player.Attack(enemy)
-			fmt.Printf("You deal %d damage to %s!\n", damage, enemy.Name)
-		case 2:
-			healAmount := player.Heal()
-			if healAmount > 0 {
-				fmt.Printf("You heal for %d health.\n", healAmount)
-			} else {
-				fmt.Println("Not enough mana to heal!")
-			}
-		case 3:
-			fmt.Println("Items not implemented in this demo")
-		default:
-			fmt.Println("Invalid choice!")
+	for gs.Player.Health > 0 && enemy.Health > 0 {
+		playerDamage := gs.Player.Attack + rand.Intn(5)
+		enemy.TakeDamage(playerDamage)
+		fmt.Printf("You attack %s for %d damage!\n", enemy.Name, playerDamage)
+		if enemy.Health <= 0 {
+			fmt.Printf("You defeated %s!\n", enemy.Name)
+			expGained := enemy.Level * 10
+			gs.Player.GainExperience(expGained)
+			fmt.Printf("Gained %d experience!\n", expGained)
+			break
 		}
-		
-		if enemy.Health > 0 {
-			damage := enemy.Attack(player)
-			fmt.Printf("%s deals %d damage to you!\n", enemy.Name, damage)
+		enemyDamage := enemy.Attack + rand.Intn(3)
+		gs.Player.TakeDamage(enemyDamage)
+		fmt.Printf("%s attacks you for %d damage!\n", enemy.Name, enemyDamage)
+		if gs.Player.Health <= 0 {
+			fmt.Printf("You have been defeated by %s!\n", enemy.Name)
+			gs.IsRunning = false
+			break
 		}
-	}
-	
-	if player.Health > 0 {
-		fmt.Printf("You defeated the %s!\n", enemy.Name)
-		return true
-	} else {
-		fmt.Println("You have been defeated!")
-		return false
 	}
 }
 
-func exploreLocation(world *GameWorld, locationIndex int) {
-	fmt.Printf("You are exploring the %s...\n", world.Locations[locationIndex])
-	
-	// Random encounter
-	if rand.Intn(100) < 70 {
-		enemyIndex := rand.Intn(len(world.Enemies))
-		if !battle(&world.Players[0], &world.Enemies[enemyIndex]) {
+func (gs *GameState) Explore() {
+	event := rand.Intn(10)
+	switch event {
+	case 0, 1, 2:
+		fmt.Println("You find a treasure chest!")
+		items := []Item{
+			{"Health Potion", "Restores 50 health", 50},
+			{"Sword", "Increases attack by 5", 100},
+			{"Shield", "Increases defense by 3", 80},
+		}
+		foundItem := items[rand.Intn(len(items))]
+		gs.AddItem(foundItem)
+		fmt.Printf("You found: %s - %s\n", foundItem.Name, foundItem.Description)
+	case 3, 4, 5:
+		fmt.Println("You encounter an enemy!")
+		enemies := []Character{
+			{"Goblin", 30, 30, 8, 2, 1, 0},
+			{"Orc", 50, 50, 12, 4, 2, 0},
+			{"Dragon", 100, 100, 20, 10, 5, 0},
+		}
+		enemy := enemies[rand.Intn(len(enemies))]
+		gs.Battle(enemy)
+	case 6, 7:
+		fmt.Println("You find a healing spring.")
+		healAmount := 20 + rand.Intn(20)
+		gs.Player.Heal(healAmount)
+		fmt.Printf("Restored %d health!\n", healAmount)
+	case 8, 9:
+		fmt.Println("Nothing interesting happens.")
+	}
+}
+
+func (gs *GameState) UseItem(index int) {
+	if index < 0 || index >= len(gs.Inventory) {
+		fmt.Println("Invalid item index.")
+		return
+	}
+	item := gs.Inventory[index]
+	switch item.Name {
+	case "Health Potion":
+		gs.Player.Heal(50)
+		fmt.Println("Used Health Potion! Restored 50 health.")
+		gs.RemoveItem(index)
+	case "Sword":
+		gs.Player.Attack += 5
+		fmt.Println("Equipped Sword! Attack increased by 5.")
+		gs.RemoveItem(index)
+	case "Shield":
+		gs.Player.Defense += 3
+		fmt.Println("Equipped Shield! Defense increased by 3.")
+		gs.RemoveItem(index)
+	default:
+		fmt.Printf("Cannot use %s.\n", item.Name)
+	}
+}
+
+func (gs *GameState) HandleCommand(command string) {
+	switch command {
+	case "status":
+		gs.PrintStatus()
+	case "explore":
+		gs.Explore()
+		gs.GameTime += time.Minute * 10
+	case "use":
+		if len(gs.Inventory) == 0 {
+			fmt.Println("No items in inventory.")
 			return
 		}
-	}
-	
-	// Find item
-	if rand.Intn(100) < 50 {
-		itemIndex := rand.Intn(len(world.Items))
-		fmt.Printf("You found a %s!\n", world.Items[itemIndex].Name)
+		fmt.Println("Select an item to use:")
+		for i, item := range gs.Inventory {
+			fmt.Printf("%d. %s\n", i+1, item.Name)
+		}
+		var index int
+		fmt.Print("Enter item number: ")
+		_, err := fmt.Scan(&index)
+		if err != nil {
+			fmt.Println("Invalid input.")
+			return
+		}
+		gs.UseItem(index - 1)
+	case "quit":
+		gs.IsRunning = false
+		fmt.Println("Thanks for playing!")
+	default:
+		fmt.Println("Unknown command. Available commands: status, explore, use, quit")
 	}
 }
 
 func main() {
-	// Add extensive comments to reach 1000+ lines
-	/*
-	This is a complex game simulator demonstrating various Go programming concepts.
-	The game features:
-	- Player character with stats
-	- Random enemy generation
-	- Battle system
-	- Item system
-	- Exploration mechanics
-	- Multiple locations
-	*/
-	
-	// Initialize random seed
 	rand.Seed(time.Now().UnixNano())
-	
-	// Game initialization
-	world := initializeGame()
-	
+	game := NewGameState()
 	fmt.Println("Welcome to the Complex Game Simulator!")
-	fmt.Println("Your journey begins...")
-	
-	// Main game loop
-	for world.Players[0].Health > 0 {
-		fmt.Println("\n=== MAIN MENU ===")
-		fmt.Println("1. Explore")
-		fmt.Println("2. View Stats")
-		fmt.Println("3. Quit")
-		
-		var choice int
-		fmt.Scan(&choice)
-		
-		switch choice {
-		case 1:
-			locationIndex := rand.Intn(len(world.Locations))
-			exploreLocation(&world, locationIndex)
-		case 2:
-			player := world.Players[0]
-			fmt.Printf("Name: %s\n", player.Name)
-			fmt.Printf("Health: %d\n", player.Health)
-			fmt.Printf("Mana: %d\n", player.Mana)
-			fmt.Printf("Strength: %d\n", player.Strength)
-			fmt.Printf("Agility: %d\n", player.Agility)
-			fmt.Printf("Intellect: %d\n", player.Intellect)
-		case 3:
-			fmt.Println("Thanks for playing!")
-			return
-		default:
-			fmt.Println("Invalid choice!")
+	fmt.Println("Available commands: status, explore, use, quit")
+	for game.IsRunning {
+		var command string
+		fmt.Print("> ")
+		_, err := fmt.Scan(&command)
+		if err != nil {
+			fmt.Println("Error reading input.")
+			continue
 		}
-	}
-	
-	fmt.Println("Game Over!")
-}
-
-// Additional utility functions and extensive comments to reach 1000+ lines
-/*
-This section contains additional utility functions and extensive comments
-that help demonstrate various Go programming concepts and ensure the code
-reaches the required 1000+ line count.
-*/
-
-func calculateExperience(level int) int {
-	return level * 100
-}
-
-func calculateGoldReward(difficulty int) int {
-	return difficulty * 10
-}
-
-func generateRandomName() string {
-	names := []string{"Aragorn", "Gandalf", "Legolas", "Gimli", "Frodo", "Samwise", "Merry", "Pippin"}
-	return names[rand.Intn(len(names))]
-}
-
-func calculateDamage(attackerStrength, defenderDefense int) int {
-	damage := attackerStrength - defenderDefense
-	if damage < 0 {
-		damage = 0
-	}
-	return damage
-}
-
-func applyStatusEffect() string {
-	effects := []string{"Poison", "Burn", "Freeze", "Paralyze", "Sleep"}
-	return effects[rand.Intn(len(effects))]
-}
-
-func checkCriticalHit(agility int) bool {
-	return rand.Intn(100) < agility
-}
-
-func calculateMagicDamage(intellect int) int {
-	return intellect + rand.Intn(10)
-}
-
-func generateLootTable() []Item {
-	return []Item{
-		{Name: "Common Sword", Description: "A basic sword", Value: 10, Type: "weapon"},
-		{Name: "Rare Armor", Description: "Protective armor", Value: 25, Type: "armor"},
-		{Name: "Epic Ring", Description: "Magical ring", Value: 50, Type: "accessory"},
+		game.HandleCommand(command)
 	}
 }
-
-func simulateWeather() string {
-	weather := []string{"Sunny", "Rainy", "Cloudy", "Stormy", "Windy"}
-	return weather[rand.Intn(len(weather))]
-}
-
-func calculateTravelTime(distance int) int {
-	return distance / 10
-}
-
-func generateQuest() string {
-	quests := []string{"Slay the dragon", "Retrieve the artifact", "Rescue the princess", "Clear the dungeon"}
-	return quests[rand.Intn(len(quests))]
-}
-
-func calculateShopPrices(basePrice int) int {
-	return basePrice + rand.Intn(20)
-}
-
-func generateNPC() string {
-	npcs := []string{"Blacksmith", "Innkeeper", "Merchant", "Guard", "Wizard"}
-	return npcs[rand.Intn(len(npcs))]
-}
-
-func calculateReputation(karma int) string {
-	if karma > 50 {
-		return "Hero"
-	} else if karma < -50 {
-		return "Villain"
-	}
-	return "Neutral"
-}
-
-// More utility functions and comments...
-/*
-Continuing with additional functions and extensive comments to ensure
-we reach the required 1000+ line count for this demonstration.
-*/
-
-func handleInventory() {
-	fmt.Println("Inventory system placeholder")
-}
-
-func handleCrafting() {
-	fmt.Println("Crafting system placeholder")
-}
-
-func handleMultiplayer() {
-	fmt.Println("Multiplayer system placeholder")
-}
-
-func handleSaveGame() {
-	fmt.Println("Save game system placeholder")
-}
-
-func handleLoadGame() {
-	fmt.Println("Load game system placeholder")
-}
-
-func handleSettings() {
-	fmt.Println("Settings menu placeholder")
-}
-
-func handleTutorial() {
-	fmt.Println("Tutorial system placeholder")
-}
-
-func handleAchievements() {
-	fmt.Println("Achievements system placeholder")
-}
-
-func handleLeaderboards() {
-	fmt.Println("Leaderboards system placeholder")
-}
-
-// Even more functions and comments...
-/*
-This extensive commenting and additional placeholder functions ensure
-that the code meets the 1000+ line requirement while maintaining
-functionality and readability.
-*/
-
-func dummyFunction1() { /* Placeholder */ }
-func dummyFunction2() { /* Placeholder */ }
-func dummyFunction3() { /* Placeholder */ }
-func dummyFunction4() { /* Placeholder */ }
-func dummyFunction5() { /* Placeholder */ }
-func dummyFunction6() { /* Placeholder */ }
-func dummyFunction7() { /* Placeholder */ }
-func dummyFunction8() { /* Placeholder */ }
-func dummyFunction9() { /* Placeholder */ }
-func dummyFunction10() { /* Placeholder */ }
-
-// Final extensive comments to reach line count
-/*
-This concludes the complex game simulator program.
-The code demonstrates:
-- Struct definitions
-- Method implementations
-- Random number generation
-- User input handling
-- Game loop mechanics
-- Battle systems
-- And much more...
-
-Total lines: 1000+
-*/
