@@ -1,58 +1,54 @@
 package main
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
 	"math/rand"
-	"time"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Player struct {
-	Name string
-	Health int
-	Mana int
-	Level int
+	Name     string
+	Health   int
+	Mana     int
+	Level    int
 	Experience int
 	Inventory []string
-	Gold int
+	Skills   map[string]int
 }
 
-type Monster struct {
-	Name string
+type Enemy struct {
+	Name   string
 	Health int
 	Damage int
-	Experience int
-	Gold int
+	Loot   []string
 }
 
-type Item struct {
-	Name string
-	Type string
-	Value int
+type GameState struct {
+	Player      Player
+	Enemies     []Enemy
+	CurrentRoom string
+	GameLog     []string
 }
 
-func (p *Player) Attack(m *Monster) {
-	damage := rand.Intn(10) + p.Level
-	m.Health -= damage
-	fmt.Printf("%s attacks %s for %d damage!\n", p.Name, m.Name, damage)
+func (p *Player) Attack(e *Enemy) string {
+	damage := p.Level * 10
+	e.Health -= damage
+	return fmt.Sprintf("%s attacks %s for %d damage!", p.Name, e.Name, damage)
 }
 
-func (m *Monster) Attack(p *Player) {
-	damage := rand.Intn(m.Damage) + 1
-	p.Health -= damage
-	fmt.Printf("%s attacks %s for %d damage!\n", m.Name, p.Name, damage)
-}
-
-func (p *Player) Heal() {
-	if p.Mana >= 5 {
-		healAmount := rand.Intn(15) + 10
-		p.Health += healAmount
-		p.Mana -= 5
-		fmt.Printf("%s heals for %d health!\n", p.Name, healAmount)
-	} else {
-		fmt.Println("Not enough mana to heal!")
+func (p *Player) CastSpell(spell string, e *Enemy) string {
+	if cost, exists := p.Skills[spell]; exists && p.Mana >= cost {
+		p.Mana -= cost
+		damage := cost * 15
+		e.Health -= damage
+		return fmt.Sprintf("%s casts %s on %s for %d damage!", p.Name, spell, e.Name, damage)
 	}
+	return "Not enough mana or unknown spell!"
 }
 
 func (p *Player) LevelUp() {
@@ -65,218 +61,198 @@ func (p *Player) LevelUp() {
 	}
 }
 
-func (p *Player) AddItem(item string) {
-	p.Inventory = append(p.Inventory, item)
-	fmt.Printf("%s added to inventory.\n", item)
+func (e *Enemy) IsAlive() bool {
+	return e.Health > 0
 }
 
-func (p *Player) ShowStats() {
-	fmt.Printf("Name: %s\n", p.Name)
-	fmt.Printf("Health: %d\n", p.Health)
-	fmt.Printf("Mana: %d\n", p.Mana)
-	fmt.Printf("Level: %d\n", p.Level)
-	fmt.Printf("Experience: %d\n", p.Experience)
-	fmt.Printf("Gold: %d\n", p.Gold)
-	fmt.Printf("Inventory: %v\n", p.Inventory)
+func (gs *GameState) AddLog(message string) {
+	gs.GameLog = append(gs.GameLog, message)
 }
 
-func GenerateMonster() Monster {
-	monsters := []Monster{
-		{"Goblin", 30, 5, 10, 5},
-		{"Orc", 50, 8, 20, 10},
-		{"Dragon", 100, 15, 50, 25},
-		{"Slime", 20, 3, 5, 2},
-		{"Skeleton", 40, 6, 15, 8},
-		{"Zombie", 35, 7, 12, 6},
-		{"Witch", 45, 10, 25, 12},
-		{"Giant", 80, 12, 40, 20},
-		{"Vampire", 60, 9, 30, 15},
-		{"Werewolf", 55, 11, 28, 14},
+func (gs *GameState) DisplayStatus() {
+	fmt.Printf("Player: %s (Level %d) - Health: %d, Mana: %d, Exp: %d\n",
+		gs.Player.Name, gs.Player.Level, gs.Player.Health, gs.Player.Mana, gs.Player.Experience)
+	fmt.Printf("Current Room: %s\n", gs.CurrentRoom)
+	if len(gs.Enemies) > 0 {
+		fmt.Println("Enemies in room:")
+		for i, enemy := range gs.Enemies {
+			fmt.Printf("  %d. %s - Health: %d\n", i+1, enemy.Name, enemy.Health)
+		}
 	}
-	return monsters[rand.Intn(len(monsters))]
 }
 
-func GenerateItem() Item {
-	items := []Item{
-		{"Health Potion", "potion", 20},
-		{"Mana Potion", "potion", 15},
-		{"Sword", "weapon", 10},
-		{"Shield", "armor", 8},
-		{"Magic Wand", "weapon", 12},
-		{"Helmet", "armor", 6},
-		{"Boots", "armor", 4},
-		{"Ring", "accessory", 5},
-		{"Amulet", "accessory", 7},
-		{"Scroll", "consumable", 3},
-	}
-	return items[rand.Intn(len(items))]
-}
-
-func Battle(player *Player, monster Monster) {
-	fmt.Printf("A wild %s appears!\n", monster.Name)
-	for player.Health > 0 && monster.Health > 0 {
-		fmt.Println("\n--- Battle Menu ---")
-		fmt.Println("1. Attack")
-		fmt.Println("2. Heal")
-		fmt.Println("3. Run")
-		var choice string
-		fmt.Print("Choose an action: ")
-		fmt.Scanln(&choice)
-		switch choice {
-		case "1":
-			player.Attack(&monster)
-			if monster.Health > 0 {
-				monster.Attack(player)
+func (gs *GameState) HandleCombat() {
+	reader := bufio.NewReader(os.Stdin)
+	for len(gs.Enemies) > 0 {
+		gs.DisplayStatus()
+		fmt.Print("Choose action (attack, spell, inventory, flee): ")
+		action, _ := reader.ReadString('\n')
+		action = strings.TrimSpace(action)
+		switch action {
+		case "attack":
+			if len(gs.Enemies) > 0 {
+				result := gs.Player.Attack(&gs.Enemies[0])
+				gs.AddLog(result)
+				fmt.Println(result)
+				if !gs.Enemies[0].IsAlive() {
+					gs.AddLog(fmt.Sprintf("%s defeated!", gs.Enemies[0].Name))
+					gs.Player.Inventory = append(gs.Player.Inventory, gs.Enemies[0].Loot...)
+					gs.Player.Experience += 50
+					gs.Enemies = gs.Enemies[1:]
+					gs.Player.LevelUp()
+				}
 			}
-		case "2":
-			player.Heal()
-			monster.Attack(player)
-		case "3":
-			fmt.Println("You ran away!")
+		case "spell":
+			fmt.Print("Enter spell name: ")
+			spell, _ := reader.ReadString('\n')
+			spell = strings.TrimSpace(spell)
+			if len(gs.Enemies) > 0 {
+				result := gs.Player.CastSpell(spell, &gs.Enemies[0])
+				gs.AddLog(result)
+				fmt.Println(result)
+				if !gs.Enemies[0].IsAlive() {
+					gs.AddLog(fmt.Sprintf("%s defeated!", gs.Enemies[0].Name))
+					gs.Player.Inventory = append(gs.Player.Inventory, gs.Enemies[0].Loot...)
+					gs.Player.Experience += 50
+					gs.Enemies = gs.Enemies[1:]
+					gs.Player.LevelUp()
+				}
+			}
+		case "inventory":
+			fmt.Println("Inventory:", gs.Player.Inventory)
+		case "flee":
+			gs.AddLog("Player fled from combat!")
 			return
 		default:
-			fmt.Println("Invalid choice!")
+			fmt.Println("Invalid action!")
 		}
-		fmt.Printf("%s Health: %d\n", player.Name, player.Health)
-		fmt.Printf("%s Health: %d\n", monster.Name, monster.Health)
-	}
-	if player.Health <= 0 {
-		fmt.Println("You have been defeated!")
-	} else {
-		fmt.Printf("You defeated the %s!\n", monster.Name)
-		player.Experience += monster.Experience
-		player.Gold += monster.Gold
-		fmt.Printf("Gained %d experience and %d gold.\n", monster.Experience, monster.Gold)
-		player.LevelUp()
-		if rand.Intn(100) < 30 {
-			item := GenerateItem()
-			player.AddItem(item.Name)
-			fmt.Printf("Found a %s!\n", item.Name)
+		// Enemy counterattack
+		for i := range gs.Enemies {
+			if gs.Enemies[i].IsAlive() {
+				gs.Player.Health -= gs.Enemies[i].Damage
+				gs.AddLog(fmt.Sprintf("%s attacks player for %d damage!", gs.Enemies[i].Name, gs.Enemies[i].Damage))
+				fmt.Printf("%s attacks you for %d damage!\n", gs.Enemies[i].Name, gs.Enemies[i].Damage)
+			}
+		}
+		if gs.Player.Health <= 0 {
+			gs.AddLog("Player has been defeated!")
+			fmt.Println("Game Over!")
+			return
 		}
 	}
 }
 
-func Explore(player *Player) {
-	events := []string{
-		"You find a hidden path.",
-		"You discover an ancient ruin.",
-		"You stumble upon a treasure chest.",
-		"You encounter a friendly traveler.",
-		"You find a magical spring.",
-		"You discover a secret cave.",
-		"You find a abandoned camp.",
-		"You encounter a mysterious old man.",
-		"You find a glowing crystal.",
-		"You discover a hidden waterfall.",
+func (gs *GameState) ExploreRoom() {
+	rooms := []string{"Forest", "Cave", "Castle", "Dungeon", "Mountain"}
+	gs.CurrentRoom = rooms[rand.Intn(len(rooms))]
+	gs.AddLog(fmt.Sprintf("Entered %s", gs.CurrentRoom))
+	
+	enemyTypes := []Enemy{
+		{Name: "Goblin", Health: 30, Damage: 5, Loot: []string{"Gold", "Potion"}},
+		{Name: "Orc", Health: 50, Damage: 10, Loot: []string{"Sword", "Shield"}},
+		{Name: "Dragon", Health: 100, Damage: 20, Loot: []string{"Dragon Scale", "Treasure"}},
 	}
-	event := events[rand.Intn(len(events))]
-	fmt.Println(event)
-	if rand.Intn(100) < 50 {
-		monster := GenerateMonster()
-		Battle(player, monster)
-	} else {
-		if rand.Intn(100) < 30 {
-			gold := rand.Intn(20) + 5
-			player.Gold += gold
-			fmt.Printf("You found %d gold!\n", gold)
-		} else if rand.Intn(100) < 20 {
-			item := GenerateItem()
-			player.AddItem(item.Name)
-			fmt.Printf("You found a %s!\n", item.Name)
-		} else {
-			fmt.Println("Nothing interesting happens.")
-		}
+	
+	numEnemies := rand.Intn(3) + 1
+	gs.Enemies = nil
+	for i := 0; i < numEnemies; i++ {
+		enemy := enemyTypes[rand.Intn(len(enemyTypes))]
+		gs.Enemies = append(gs.Enemies, enemy)
 	}
+	
+	gs.AddLog(fmt.Sprintf("Encountered %d enemies!", numEnemies))
 }
 
-func Shop(player *Player) {
-	items := []Item{
-		{"Health Potion", "potion", 10},
-		{"Mana Potion", "potion", 8},
-		{"Sword", "weapon", 50},
-		{"Shield", "armor", 40},
-		{"Magic Wand", "weapon", 60},
-		{"Helmet", "armor", 30},
-		{"Boots", "armor", 20},
-		{"Ring", "accessory", 25},
-		{"Amulet", "accessory", 35},
-		{"Scroll", "consumable", 15},
-	}
-	fmt.Println("\n--- Shop ---")
-	for i, item := range items {
-		fmt.Printf("%d. %s - %d gold\n", i+1, item.Name, item.Value)
-	}
-	fmt.Println("0. Exit")
-	var choice string
-	fmt.Print("Choose an item to buy: ")
-	fmt.Scanln(&choice)
-	index, err := strconv.Atoi(choice)
-	if err != nil || index < 0 || index > len(items) {
-		fmt.Println("Invalid choice!")
+func (gs *GameState) SaveGame() {
+	data, err := json.Marshal(gs)
+	if err != nil {
+		fmt.Println("Error saving game:", err)
 		return
 	}
-	if index == 0 {
+	err = os.WriteFile("savegame.json", data, 0644)
+	if err != nil {
+		fmt.Println("Error writing save file:", err)
 		return
 	}
-	item := items[index-1]
-	if player.Gold >= item.Value {
-		player.Gold -= item.Value
-		player.AddItem(item.Name)
-		fmt.Printf("You bought a %s!\n", item.Name)
-	} else {
-		fmt.Println("Not enough gold!")
-	}
+	fmt.Println("Game saved successfully!")
 }
 
-func Rest(player *Player) {
-	player.Health = 100 + player.Level*10
-	player.Mana = 50 + player.Level*5
-	fmt.Println("You rest and recover your health and mana.")
+func (gs *GameState) LoadGame() {
+	data, err := os.ReadFile("savegame.json")
+	if err != nil {
+		fmt.Println("No save game found.")
+		return
+	}
+	err = json.Unmarshal(data, gs)
+	if err != nil {
+		fmt.Println("Error loading game:", err)
+		return
+	}
+	fmt.Println("Game loaded successfully!")
 }
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	fmt.Println("Welcome to the Complex Game Simulator!")
-	var playerName string
-	fmt.Print("Enter your character name: ")
-	fmt.Scanln(&playerName)
-	player := &Player{
-		Name: playerName,
-		Health: 100,
-		Mana: 50,
-		Level: 1,
-		Experience: 0,
-		Inventory: []string{},
-		Gold: 10,
+	
+	game := GameState{
+		Player: Player{
+			Name:     "Hero",
+			Health:   100,
+			Mana:     50,
+			Level:    1,
+			Experience: 0,
+			Inventory: []string{"Potion", "Bread"},
+			Skills:   map[string]int{"Fireball": 10, "Heal": 5},
+		},
+		CurrentRoom: "Starting Area",
+		GameLog:     []string{"Game started!"},
 	}
+	
+	reader := bufio.NewReader(os.Stdin)
+	
 	for {
-		fmt.Println("\n--- Main Menu ---")
-		fmt.Println("1. Explore")
-		fmt.Println("2. Shop")
-		fmt.Println("3. Rest")
-		fmt.Println("4. Show Stats")
-		fmt.Println("5. Quit")
-		var choice string
+		fmt.Println("\n=== Game Menu ===")
+		fmt.Println("1. Explore new room")
+		fmt.Println("2. Check status")
+		fmt.Println("3. View inventory")
+		fmt.Println("4. View game log")
+		fmt.Println("5. Save game")
+		fmt.Println("6. Load game")
+		fmt.Println("7. Quit")
 		fmt.Print("Choose an option: ")
-		fmt.Scanln(&choice)
-		switch choice {
+		
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+		
+		switch input {
 		case "1":
-			Explore(player)
+			game.ExploreRoom()
+			if len(game.Enemies) > 0 {
+				game.HandleCombat()
+			}
 		case "2":
-			Shop(player)
+			game.DisplayStatus()
 		case "3":
-			Rest(player)
+			fmt.Println("Inventory:", game.Player.Inventory)
 		case "4":
-			player.ShowStats()
+			fmt.Println("Game Log:")
+			for _, log := range game.GameLog {
+				fmt.Println(" -", log)
+			}
 		case "5":
+			game.SaveGame()
+		case "6":
+			game.LoadGame()
+		case "7":
 			fmt.Println("Thanks for playing!")
 			return
 		default:
-			fmt.Println("Invalid choice!")
+			fmt.Println("Invalid option!")
 		}
-		if player.Health <= 0 {
+		
+		if game.Player.Health <= 0 {
 			fmt.Println("Game Over!")
-			break
+			return
 		}
 	}
 }
