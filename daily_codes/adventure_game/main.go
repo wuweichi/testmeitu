@@ -31,22 +31,44 @@ type Enemy struct {
 	Gold    int
 }
 
-type Location struct {
+type Item struct {
 	Name        string
 	Description string
-	Enemies     []Enemy
-	Items       []string
-	Connections []string
+	Effect      func(*Character)
 }
 
 var player Character
-var currentLocation string
-var locations map[string]Location
-var gameRunning bool
+var enemies = []Enemy{
+	{"Goblin", 30, 5, 2, 10, 5},
+	{"Orc", 50, 8, 4, 20, 10},
+	{"Dragon", 100, 15, 10, 50, 25},
+}
 
-func initGame() {
+var items = []Item{
+	{"Health Potion", "Restores 20 health", func(c *Character) {
+		c.Health = min(c.Health+20, c.MaxHealth)
+		fmt.Println("You restored 20 health!")
+	}},
+	{"Strength Potion", "Increases attack by 5", func(c *Character) {
+		c.Attack += 5
+		fmt.Println("Your attack increased by 5!")
+	}},
+}
+
+func main() {
+	rand.Seed(time.Now().UnixNano())
+	initializeGame()
+	gameLoop()
+}
+
+func initializeGame() {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Enter your character's name: ")
+	name, _ := reader.ReadString('\n')
+	name = strings.TrimSpace(name)
+	
 	player = Character{
-		Name:      "Hero",
+		Name:      name,
 		Health:    100,
 		MaxHealth: 100,
 		Attack:    10,
@@ -54,225 +76,225 @@ func initGame() {
 		Level:     1,
 		Exp:       0,
 		Gold:      50,
-		Inventory: []string{"Health Potion", "Health Potion"},
+		Inventory: []string{"Health Potion"},
 	}
-
-	locations = make(map[string]Location)
-
-	locations["forest"] = Location{
-		Name:        "Dark Forest",
-		Description: "A dense, dark forest with tall trees and mysterious sounds.",
-		Enemies: []Enemy{
-			{Name: "Goblin", Health: 30, Attack: 5, Defense: 2, Exp: 10, Gold: 5},
-			{Name: "Wolf", Health: 25, Attack: 7, Defense: 1, Exp: 8, Gold: 3},
-		},
-		Items:       []string{"Health Potion", "Iron Sword"},
-		Connections: []string{"village", "cave"},
-	}
-
-	locations["village"] = Location{
-		Name:        "Peaceful Village",
-		Description: "A small, peaceful village with friendly inhabitants.",
-		Enemies:     []Enemy{},
-		Items:       []string{"Bread", "Health Potion"},
-		Connections: []string{"forest", "castle"},
-	}
-
-	locations["cave"] = Location{
-		Name:        "Dark Cave",
-		Description: "A dark and damp cave with glowing mushrooms.",
-		Enemies: []Enemy{
-			{Name: "Bat", Health: 15, Attack: 3, Defense: 0, Exp: 5, Gold: 2},
-			{Name: "Spider", Health: 20, Attack: 4, Defense: 1, Exp: 7, Gold: 4},
-		},
-		Items:       []string{"Gold Coin", "Magic Ring"},
-		Connections: []string{"forest"},
-	}
-
-	locations["castle"] = Location{
-		Name:        "Ancient Castle",
-		Description: "An ancient castle with towering walls and a mysterious aura.",
-		Enemies: []Enemy{
-			{Name: "Skeleton", Health: 40, Attack: 8, Defense: 3, Exp: 15, Gold: 10},
-			{Name: "Dragon", Health: 100, Attack: 20, Defense: 10, Exp: 50, Gold: 100},
-		},
-		Items:       []string{"Dragon Scale", "Ancient Artifact"},
-		Connections: []string{"village"},
-	}
-
-	currentLocation = "village"
-	gameRunning = true
+	
+	fmt.Printf("Welcome, %s! Your adventure begins now.\n", player.Name)
 }
 
-func showStatus() {
-	fmt.Printf("=== %s Status ===\n", player.Name)
-	fmt.Printf("Health: %d/%d\n", player.Health, player.MaxHealth)
-	fmt.Printf("Attack: %d\n", player.Attack)
-	fmt.Printf("Defense: %d\n", player.Defense)
-	fmt.Printf("Level: %d\n", player.Level)
-	fmt.Printf("Exp: %d/%d\n", player.Exp, player.Level*100)
-	fmt.Printf("Gold: %d\n", player.Gold)
-	fmt.Printf("Inventory: %v\n", player.Inventory)
-	fmt.Println()
-}
-
-func showLocation() {
-	loc := locations[currentLocation]
-	fmt.Printf("=== %s ===\n", loc.Name)
-	fmt.Println(loc.Description)
-
-	if len(loc.Enemies) > 0 {
-		fmt.Println("Enemies here:")
-		for _, enemy := range loc.Enemies {
-			fmt.Printf("  - %s (Health: %d)\n", enemy.Name, enemy.Health)
-		}
-	}
-
-	if len(loc.Items) > 0 {
-		fmt.Println("Items here:")
-		for _, item := range loc.Items {
-			fmt.Printf("  - %s\n", item)
-		}
-	}
-
-	fmt.Println("Connected locations:")
-	for _, conn := range loc.Connections {
-		fmt.Printf("  - %s\n", conn)
-	}
-	fmt.Println()
-}
-
-func moveToLocation(target string) {
-	loc := locations[currentLocation]
-	for _, conn := range loc.Connections {
-		if conn == target {
-			currentLocation = target
-			fmt.Printf("You moved to %s.\n", locations[target].Name)
-			return
-		}
-	}
-	fmt.Println("You can't move to that location from here.")
-}
-
-func fightEnemy(enemyName string) {
-	loc := locations[currentLocation]
-	var enemy Enemy
-	found := false
-
-	for _, e := range loc.Enemies {
-		if e.Name == enemyName {
-			enemy = e
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		fmt.Println("Enemy not found here.")
-		return
-	}
-
-	fmt.Printf("You are fighting a %s!\n", enemy.Name)
-
-	for player.Health > 0 && enemy.Health > 0 {
-		fmt.Printf("\nYour Health: %d, %s's Health: %d\n", player.Health, enemy.Name, enemy.Health)
-		fmt.Println("1. Attack")
-		fmt.Println("2. Use Item")
-		fmt.Println("3. Run Away")
-
+func gameLoop() {
+	for {
+		displayStatus()
+		fmt.Println("\nChoose an action:")
+		fmt.Println("1. Explore")
+		fmt.Println("2. Check Inventory")
+		fmt.Println("3. Rest")
+		fmt.Println("4. Quit")
+		
 		reader := bufio.NewReader(os.Stdin)
 		input, _ := reader.ReadString('\n')
 		input = strings.TrimSpace(input)
-
+		
 		switch input {
 		case "1":
-			damage := player.Attack - enemy.Defense
-			if damage < 1 {
-				damage = 1
-			}
-			enemy.Health -= damage
-			fmt.Printf("You hit the %s for %d damage!\n", enemy.Name, damage)
-
-			if enemy.Health <= 0 {
-				fmt.Printf("You defeated the %s!\n", enemy.Name)
-				player.Exp += enemy.Exp
-				player.Gold += enemy.Gold
-				fmt.Printf("Gained %d exp and %d gold.\n", enemy.Exp, enemy.Gold)
-				checkLevelUp()
-				removeEnemy(enemyName)
-				return
-			}
-
-			enemyDamage := enemy.Attack - player.Defense
-			if enemyDamage < 1 {
-				enemyDamage = 1
-			}
-			player.Health -= enemyDamage
-			fmt.Printf("The %s hits you for %d damage!\n", enemy.Name, enemyDamage)
-
-			if player.Health <= 0 {
-				fmt.Println("You have been defeated!")
-				gameRunning = false
-				return
-			}
-
+			explore()
 		case "2":
-			useItem()
+			checkInventory()
 		case "3":
-			fmt.Println("You ran away from the fight!")
+			rest()
+		case "4":
+			fmt.Println("Thanks for playing!")
 			return
 		default:
-			fmt.Println("Invalid choice.")
+			fmt.Println("Invalid choice. Please try again.")
+		}
+		
+		if player.Health <= 0 {
+			fmt.Println("You have been defeated. Game over!")
+			return
 		}
 	}
 }
 
-func removeEnemy(enemyName string) {
-	loc := locations[currentLocation]
-	for i, enemy := range loc.Enemies {
-		if enemy.Name == enemyName {
-			loc.Enemies = append(loc.Enemies[:i], loc.Enemies[i+1:]...)
-			locations[currentLocation] = loc
-			break
-		}
+func displayStatus() {
+	fmt.Printf("\n--- %s's Status ---\n", player.Name)
+	fmt.Printf("Health: %d/%d\n", player.Health, player.MaxHealth)
+	fmt.Printf("Level: %d\n", player.Level)
+	fmt.Printf("Exp: %d/%d\n", player.Exp, player.Level*100)
+	fmt.Printf("Gold: %d\n", player.Gold)
+	fmt.Printf("Attack: %d, Defense: %d\n", player.Attack, player.Defense)
+}
+
+func explore() {
+	fmt.Println("You venture into the wilderness...")
+	
+	// Random encounter
+	encounter := rand.Intn(3)
+	if encounter == 0 {
+		fmt.Println("You found a treasure chest!")
+		foundGold := rand.Intn(20) + 10
+		player.Gold += foundGold
+		fmt.Printf("You found %d gold!\n", foundGold)
+	} else if encounter == 1 {
+		fmt.Println("You discovered a hidden item!")
+		itemIndex := rand.Intn(len(items))
+		player.Inventory = append(player.Inventory, items[itemIndex].Name)
+		fmt.Printf("You found a %s!\n", items[itemIndex].Name)
+	} else {
+		battle()
 	}
 }
 
-func useItem() {
+func battle() {
+	enemy := enemies[rand.Intn(len(enemies))]
+	fmt.Printf("A wild %s appears!\n", enemy.Name)
+	
+	for player.Health > 0 && enemy.Health > 0 {
+		fmt.Printf("\n%s's Health: %d\n", enemy.Name, enemy.Health)
+		fmt.Println("Choose your action:")
+		fmt.Println("1. Attack")
+		fmt.Println("2. Use Item")
+		fmt.Println("3. Flee")
+		
+		reader := bufio.NewReader(os.Stdin)
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+		
+		switch input {
+		case "1":
+			playerAttack(&enemy)
+		case "2":
+			useItemInBattle()
+		case "3":
+			if rand.Intn(2) == 0 {
+				fmt.Println("You successfully fled!")
+				return
+			} else {
+				fmt.Println("You failed to flee!")
+				enemyAttack(&enemy)
+			}
+		default:
+			fmt.Println("Invalid choice. The enemy attacks!")
+			enemyAttack(&enemy)
+		}
+		
+		if enemy.Health > 0 {
+			enemyAttack(&enemy)
+		}
+	}
+	
+	if enemy.Health <= 0 {
+		fmt.Printf("You defeated the %s!\n", enemy.Name)
+		player.Exp += enemy.Exp
+		player.Gold += enemy.Gold
+		fmt.Printf("Gained %d exp and %d gold!\n", enemy.Exp, enemy.Gold)
+		checkLevelUp()
+	}
+}
+
+func playerAttack(enemy *Enemy) {
+	damage := max(player.Attack-enemy.Defense, 1)
+	enemy.Health -= damage
+	fmt.Printf("You dealt %d damage to the %s!\n", damage, enemy.Name)
+}
+
+func enemyAttack(enemy *Enemy) {
+	damage := max(enemy.Attack-player.Defense, 1)
+	player.Health -= damage
+	fmt.Printf("The %s dealt %d damage to you!\n", enemy.Name, damage)
+}
+
+func useItemInBattle() {
 	if len(player.Inventory) == 0 {
-		fmt.Println("You have no items.")
+		fmt.Println("Your inventory is empty!")
 		return
 	}
-
+	
 	fmt.Println("Your inventory:")
 	for i, item := range player.Inventory {
 		fmt.Printf("%d. %s\n", i+1, item)
 	}
-
+	
 	reader := bufio.NewReader(os.Stdin)
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(input)
-
+	
 	index, err := strconv.Atoi(input)
 	if err != nil || index < 1 || index > len(player.Inventory) {
 		fmt.Println("Invalid choice.")
 		return
 	}
-
-	item := player.Inventory[index-1]
-	if item == "Health Potion" {
-		healAmount := 30
-		player.Health += healAmount
-		if player.Health > player.MaxHealth {
-			player.Health = player.MaxHealth
+	
+	itemName := player.Inventory[index-1]
+	for _, item := range items {
+		if item.Name == itemName {
+			item.Effect(&player)
+			player.Inventory = append(player.Inventory[:index-1], player.Inventory[index:]...)
+			return
 		}
-		fmt.Printf("You used a Health Potion and recovered %d health.\n", healAmount)
-	} else {
-		fmt.Printf("You used %s, but it has no effect in battle.\n", item)
+	}
+	
+	fmt.Println("Item not found.")
+}
+
+func checkInventory() {
+	if len(player.Inventory) == 0 {
+		fmt.Println("Your inventory is empty.")
 		return
 	}
+	
+	fmt.Println("Your inventory:")
+	for i, item := range player.Inventory {
+		fmt.Printf("%d. %s\n", i+1, item)
+	}
+	
+	fmt.Println("\nDo you want to use an item? (y/n)")
+	reader := bufio.NewReader(os.Stdin)
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+	
+	if strings.ToLower(input) == "y" {
+		useItem()
+	}
+}
 
-	player.Inventory = append(player.Inventory[:index-1], player.Inventory[index:]...)
+func useItem() {
+	if len(player.Inventory) == 0 {
+		fmt.Println("Your inventory is empty!")
+		return
+	}
+	
+	fmt.Println("Choose an item to use:")
+	for i, item := range player.Inventory {
+		fmt.Printf("%d. %s\n", i+1, item)
+	}
+	
+	reader := bufio.NewReader(os.Stdin)
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+	
+	index, err := strconv.Atoi(input)
+	if err != nil || index < 1 || index > len(player.Inventory) {
+		fmt.Println("Invalid choice.")
+		return
+	}
+	
+	itemName := player.Inventory[index-1]
+	for _, item := range items {
+		if item.Name == itemName {
+			item.Effect(&player)
+			player.Inventory = append(player.Inventory[:index-1], player.Inventory[index:]...)
+			return
+		}
+	}
+	
+	fmt.Println("Item not found.")
+}
+
+func rest() {
+	fmt.Println("You take a rest and recover some health.")
+	player.Health = min(player.Health+30, player.MaxHealth)
+	fmt.Printf("Health restored to %d/%d\n", player.Health, player.MaxHealth)
 }
 
 func checkLevelUp() {
@@ -284,87 +306,20 @@ func checkLevelUp() {
 		player.Attack += 3
 		player.Defense += 2
 		fmt.Printf("Level up! You are now level %d!\n", player.Level)
+		fmt.Println("Your stats have improved!")
 	}
 }
 
-func pickUpItem(itemName string) {
-	loc := locations[currentLocation]
-	for i, item := range loc.Items {
-		if item == itemName {
-			player.Inventory = append(player.Inventory, item)
-			loc.Items = append(loc.Items[:i], loc.Items[i+1:]...)
-			locations[currentLocation] = loc
-			fmt.Printf("You picked up %s.\n", item)
-			return
-		}
+func min(a, b int) int {
+	if a < b {
+		return a
 	}
-	fmt.Println("Item not found here.")
+	return b
 }
 
-func showHelp() {
-	fmt.Println("=== Adventure Game Commands ===")
-	fmt.Println("status - Show player status")
-	fmt.Println("look - Show current location")
-	fmt.Println("move <location> - Move to another location")
-	fmt.Println("fight <enemy> - Fight an enemy")
-	fmt.Println("pickup <item> - Pick up an item")
-	fmt.Println("help - Show this help message")
-	fmt.Println("quit - Quit the game")
-	fmt.Println()
-}
-
-func main() {
-	fmt.Println("Welcome to the Adventure Game!")
-	fmt.Println("Type 'help' for a list of commands.")
-	fmt.Println()
-
-	initGame()
-	rand.Seed(time.Now().UnixNano())
-
-	reader := bufio.NewReader(os.Stdin)
-
-	for gameRunning {
-		fmt.Print("> ")
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(input)
-		parts := strings.Fields(input)
-
-		if len(parts) == 0 {
-			continue
-		}
-
-		command := parts[0]
-
-		switch command {
-		case "status":
-			showStatus()
-		case "look":
-			showLocation()
-		case "move":
-			if len(parts) < 2 {
-				fmt.Println("Please specify a location to move to.")
-			} else {
-				moveToLocation(parts[1])
-			}
-		case "fight":
-			if len(parts) < 2 {
-				fmt.Println("Please specify an enemy to fight.")
-			} else {
-				fightEnemy(parts[1])
-			}
-		case "pickup":
-			if len(parts) < 2 {
-				fmt.Println("Please specify an item to pick up.")
-			} else {
-				pickUpItem(parts[1])
-			}
-		case "help":
-			showHelp()
-		case "quit":
-			fmt.Println("Thanks for playing!")
-			gameRunning = false
-		default:
-			fmt.Println("Unknown command. Type 'help' for a list of commands.")
-		}
+func max(a, b int) int {
+	if a > b {
+		return a
 	}
+	return b
 }
