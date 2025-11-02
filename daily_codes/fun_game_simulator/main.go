@@ -1,444 +1,347 @@
 package main
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
 	"math/rand"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 )
 
-// Player represents a game player
 type Player struct {
-	Name  string
-	Score int
-	Level int
+	Name     string
+	Health   int
+	Strength int
+	Agility  int
+	Level    int
+	Exp      int
 }
 
-// Game represents the main game state
-type Game struct {
-	Players []Player
-	Round   int
-	Active  bool
+type Monster struct {
+	Name     string
+	Health   int
+	Strength int
+	Agility  int
 }
 
-// NewGame creates a new game instance
-func NewGame() *Game {
-	return &Game{
-		Players: []Player{},
-		Round:   1,
-		Active:  true,
-	}
-}
-
-// AddPlayer adds a new player to the game
-func (g *Game) AddPlayer(name string) {
-	player := Player{
-		Name:  name,
-		Score: 0,
-		Level: 1,
-	}
-	g.Players = append(g.Players, player)
-	fmt.Printf("Player %s joined the game!\n", name)
-}
-
-// StartRound begins a new round of the game
-func (g *Game) StartRound() {
-	fmt.Printf("\n=== Round %d ===\n", g.Round)
-	for i := range g.Players {
-		points := rand.Intn(100) + 1
-		g.Players[i].Score += points
-		if g.Players[i].Score > g.Players[i].Level*100 {
-			g.Players[i].Level++
-			fmt.Printf("%s leveled up to level %d!\n", g.Players[i].Name, g.Players[i].Level)
-		}
-		fmt.Printf("%s earned %d points (Total: %d)\n", g.Players[i].Name, points, g.Players[i].Score)
-	}
-	g.Round++
-}
-
-// DisplayScores shows all player scores
-func (g *Game) DisplayScores() {
-	fmt.Println("\n=== Current Scores ===")
-	for _, player := range g.Players {
-		fmt.Printf("%s: %d points (Level %d)\n", player.Name, player.Score, player.Level)
-	}
-}
-
-// CheckWinner determines if there's a winner
-func (g *Game) CheckWinner() *Player {
-	var winner *Player
-	maxScore := 0
-	
-	for i := range g.Players {
-		if g.Players[i].Score > maxScore {
-			maxScore = g.Players[i].Score
-			winner = &g.Players[i]
-		}
-	}
-	
-	if maxScore >= 1000 {
-		return winner
-	}
-	return nil
-}
-
-// SimulateGame runs the main game simulation
-func SimulateGame() {
-	fmt.Println("Welcome to the Fun Game Simulator!")
-	fmt.Println("===================================")
-	
-	game := NewGame()
-	
-	// Add some players
-	players := []string{"Alice", "Bob", "Charlie", "Diana", "Eve", "Frank", "Grace", "Henry"}
-	for _, name := range players {
-		game.AddPlayer(name)
-	}
-	
-	// Game loop
-	for game.Active {
-		game.StartRound()
-		game.DisplayScores()
-		
-		// Check for winner
-		if winner := game.CheckWinner(); winner != nil {
-			fmt.Printf("\n🎉 Congratulations! %s wins with %d points! 🎉\n", winner.Name, winner.Score)
-			game.Active = false
-			break
-		}
-		
-		// Small delay between rounds
-		time.Sleep(1 * time.Second)
-	}
-	
-	fmt.Println("\nGame Over! Thanks for playing!")
-}
-
-// Additional utility functions to increase code length
-
-// CalculateAverageScore calculates the average score of all players
-func (g *Game) CalculateAverageScore() float64 {
-	if len(g.Players) == 0 {
-		return 0
-	}
-	
-	total := 0
-	for _, player := range g.Players {
-		total += player.Score
-	}
-	return float64(total) / float64(len(g.Players))
-}
-
-// GetTopPlayers returns the top N players by score
-func (g *Game) GetTopPlayers(n int) []Player {
-	if n > len(g.Players) {
-		n = len(g.Players)
-	}
-	
-	// Create a copy to avoid modifying original
-	players := make([]Player, len(g.Players))
-	copy(players, g.Players)
-	
-	// Simple bubble sort for demonstration
-	for i := 0; i < len(players)-1; i++ {
-		for j := 0; j < len(players)-i-1; j++ {
-			if players[j].Score < players[j+1].Score {
-				players[j], players[j+1] = players[j+1], players[j]
-			}
-		}
-	}
-	
-	return players[:n]
-}
-
-// SaveGameState simulates saving game state (placeholder)
-func (g *Game) SaveGameState() {
-	fmt.Println("Game state saved!")
-}
-
-// LoadGameState simulates loading game state (placeholder)
-func (g *Game) LoadGameState() {
-	fmt.Println("Game state loaded!")
-}
-
-// ResetGame resets the game to initial state
-func (g *Game) ResetGame() {
-	for i := range g.Players {
-		g.Players[i].Score = 0
-		g.Players[i].Level = 1
-	}
-	g.Round = 1
-	g.Active = true
-	fmt.Println("Game has been reset!")
-}
-
-// PlayerStats displays detailed statistics for a player
-func (p *Player) PlayerStats() {
-	fmt.Printf("\nPlayer: %s\n", p.Name)
-	fmt.Printf("Score: %d\n", p.Score)
-	fmt.Printf("Level: %d\n", p.Level)
-	fmt.Printf("Points needed for next level: %d\n", p.Level*100-p.Score)
-}
-
-// GameStatistics displays overall game statistics
-func (g *Game) GameStatistics() {
-	fmt.Println("\n=== Game Statistics ===")
-	fmt.Printf("Total Players: %d\n", len(g.Players))
-	fmt.Printf("Current Round: %d\n", g.Round)
-	fmt.Printf("Average Score: %.2f\n", g.CalculateAverageScore())
-	
-	topPlayers := g.GetTopPlayers(3)
-	fmt.Println("\nTop 3 Players:")
-	for i, player := range topPlayers {
-		fmt.Printf("%d. %s - %d points\n", i+1, player.Name, player.Score)
-	}
-}
-
-// Complex mathematical functions to increase code complexity
-
-// Fibonacci calculates the nth Fibonacci number
-func Fibonacci(n int) int {
-	if n <= 1 {
-		return n
-	}
-	return Fibonacci(n-1) + Fibonacci(n-2)
-}
-
-// Factorial calculates factorial of n
-func Factorial(n int) int {
-	if n <= 1 {
-		return 1
-	}
-	return n * Factorial(n-1)
-}
-
-// IsPrime checks if a number is prime
-func IsPrime(n int) bool {
-	if n <= 1 {
-		return false
-	}
-	if n <= 3 {
-		return true
-	}
-	if n%2 == 0 || n%3 == 0 {
-		return false
-	}
-	
-	i := 5
-	for i*i <= n {
-		if n%i == 0 || n%(i+2) == 0 {
-			return false
-		}
-		i += 6
-	}
-	return true
-}
-
-// GCD calculates greatest common divisor
-func GCD(a, b int) int {
-	for b != 0 {
-		a, b = b, a%b
-	}
-	return a
-}
-
-// LCM calculates least common multiple
-func LCM(a, b int) int {
-	return a * b / GCD(a, b)
-}
-
-// String manipulation functions
-
-// ReverseString reverses a string
-func ReverseString(s string) string {
-	runes := []rune(s)
-	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
-		runes[i], runes[j] = runes[j], runes[i]
-	}
-	return string(runes)
-}
-
-// CountVowels counts vowels in a string
-func CountVowels(s string) int {
-	count := 0
-	vowels := "aeiouAEIOU"
-	for _, char := range s {
-		for _, vowel := range vowels {
-			if char == vowel {
-				count++
-				break
-			}
-		}
-	}
-	return count
-}
-
-// IsPalindrome checks if a string is a palindrome
-func IsPalindrome(s string) bool {
-	return s == ReverseString(s)
-}
-
-// File operations simulation
-
-// FileHandler simulates file operations
-type FileHandler struct {
-	Filename string
-	Content  []string
-}
-
-// NewFileHandler creates a new file handler
-func NewFileHandler(filename string) *FileHandler {
-	return &FileHandler{
-		Filename: filename,
-		Content:  []string{},
-	}
-}
-
-// WriteLine writes a line to the file
-func (fh *FileHandler) WriteLine(line string) {
-	fh.Content = append(fh.Content, line)
-	fmt.Printf("Written to %s: %s\n", fh.Filename, line)
-}
-
-// ReadAll reads all content from the file
-func (fh *FileHandler) ReadAll() []string {
-	fmt.Printf("Reading from %s:\n", fh.Filename)
-	for i, line := range fh.Content {
-		fmt.Printf("Line %d: %s\n", i+1, line)
-	}
-	return fh.Content
-}
-
-// ClearFile clears all content from the file
-func (fh *FileHandler) ClearFile() {
-	fh.Content = []string{}
-	fmt.Printf("Cleared all content from %s\n", fh.Filename)
-}
-
-// Advanced game features
-
-// PowerUp represents a game power-up
-type PowerUp struct {
+type Item struct {
 	Name        string
 	Description string
-	Effect      func(*Player)
+	Value       int
 }
 
-// ApplyDoubleScore doubles the player's score
-func ApplyDoubleScore(player *Player) {
-	player.Score *= 2
-	fmt.Printf("%s used Double Score power-up! Score is now %d\n", player.Name, player.Score)
+type GameState struct {
+	Player      Player
+	Monsters    []Monster
+	Items       []Item
+	CurrentRoom string
+	GameOver    bool
 }
 
-// ApplyLevelBoost increases player level by 2
-func ApplyLevelBoost(player *Player) {
-	player.Level += 2
-	fmt.Printf("%s used Level Boost power-up! Level is now %d\n", player.Name, player.Level)
+func (p *Player) Attack(m *Monster) int {
+	damage := p.Strength + rand.Intn(10)
+	m.Health -= damage
+	return damage
 }
 
-// CreatePowerUps creates available power-ups
-func CreatePowerUps() []PowerUp {
-	return []PowerUp{
-		{
-			Name:        "Double Score",
-			Description: "Doubles your current score",
-			Effect:      ApplyDoubleScore,
-		},
-		{
-			Name:        "Level Boost",
-			Description: "Increases your level by 2",
-			Effect:      ApplyLevelBoost,
-		},
+func (m *Monster) Attack(p *Player) int {
+	damage := m.Strength + rand.Intn(5)
+	p.Health -= damage
+	return damage
+}
+
+func (p *Player) LevelUp() {
+	if p.Exp >= p.Level*100 {
+		p.Level++
+		p.Strength += 5
+		p.Agility += 3
+		p.Health += 20
+		p.Exp = 0
+		fmt.Printf("Level up! You are now level %d\n", p.Level)
 	}
 }
 
-// UsePowerUp allows a player to use a power-up
-func (p *Player) UsePowerUp(powerUp PowerUp) {
-	fmt.Printf("\n%s is using %s power-up!\n", p.Name, powerUp.Name)
-	fmt.Printf("Effect: %s\n", powerUp.Description)
-	powerUp.Effect(p)
+func (p *Player) Heal(amount int) {
+	p.Health += amount
+	if p.Health > 100+p.Level*10 {
+		p.Health = 100 + p.Level*10
+	}
 }
 
-// Main function with extensive demonstration
+func (p *Player) IsAlive() bool {
+	return p.Health > 0
+}
+
+func (m *Monster) IsAlive() bool {
+	return m.Health > 0
+}
+
+func NewPlayer(name string) Player {
+	return Player{
+		Name:     name,
+		Health:   100,
+		Strength: 10,
+		Agility:  10,
+		Level:    1,
+		Exp:      0,
+	}
+}
+
+func NewMonster(name string, health, strength, agility int) Monster {
+	return Monster{
+		Name:     name,
+		Health:   health,
+		Strength: strength,
+		Agility:  agility,
+	}
+}
+
+func NewItem(name, description string, value int) Item {
+	return Item{
+		Name:        name,
+		Description: description,
+		Value:       value,
+	}
+}
+
+func InitGame() GameState {
+	player := NewPlayer("Hero")
+	monsters := []Monster{
+		NewMonster("Goblin", 30, 5, 8),
+		NewMonster("Orc", 50, 10, 5),
+		NewMonster("Dragon", 100, 20, 3),
+	}
+	items := []Item{
+		NewItem("Health Potion", "Restores 50 health", 50),
+		NewItem("Strength Elixir", "Increases strength by 5", 5),
+		NewItem("Agility Boots", "Increases agility by 3", 3),
+	}
+	return GameState{
+		Player:      player,
+		Monsters:    monsters,
+		Items:       items,
+		CurrentRoom: "start",
+		GameOver:    false,
+	}
+}
+
+func (gs *GameState) SaveGame(filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	return encoder.Encode(gs)
+}
+
+func (gs *GameState) LoadGame(filename string) error {
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+	return decoder.Decode(gs)
+}
+
+func (gs *GameState) DisplayStatus() {
+	fmt.Printf("Player: %s\n", gs.Player.Name)
+	fmt.Printf("Health: %d\n", gs.Player.Health)
+	fmt.Printf("Strength: %d\n", gs.Player.Strength)
+	fmt.Printf("Agility: %d\n", gs.Player.Agility)
+	fmt.Printf("Level: %d\n", gs.Player.Level)
+	fmt.Printf("Exp: %d\n", gs.Player.Exp)
+	fmt.Printf("Current Room: %s\n", gs.CurrentRoom)
+}
+
+func (gs *GameState) DisplayMonsters() {
+	fmt.Println("Monsters in the area:")
+	for i, monster := range gs.Monsters {
+		if monster.IsAlive() {
+			fmt.Printf("%d. %s (Health: %d, Strength: %d, Agility: %d)\n", i+1, monster.Name, monster.Health, monster.Strength, monster.Agility)
+		}
+	}
+}
+
+func (gs *GameState) DisplayItems() {
+	fmt.Println("Items available:")
+	for i, item := range gs.Items {
+		fmt.Printf("%d. %s - %s (Value: %d)\n", i+1, item.Name, item.Description, item.Value)
+	}
+}
+
+func (gs *GameState) Fight(monsterIndex int) {
+	if monsterIndex < 0 || monsterIndex >= len(gs.Monsters) {
+		fmt.Println("Invalid monster index")
+		return
+	}
+	monster := &gs.Monsters[monsterIndex]
+	if !monster.IsAlive() {
+		fmt.Println("This monster is already defeated")
+		return
+	}
+
+	fmt.Printf("You are fighting %s!\n", monster.Name)
+	for gs.Player.IsAlive() && monster.IsAlive() {
+		playerDamage := gs.Player.Attack(monster)
+		fmt.Printf("You attack %s for %d damage. %s's health: %d\n", monster.Name, playerDamage, monster.Name, monster.Health)
+		if !monster.IsAlive() {
+			fmt.Printf("You defeated %s!\n", monster.Name)
+			gs.Player.Exp += 50
+			gs.Player.LevelUp()
+			break
+		}
+
+		monsterDamage := monster.Attack(&gs.Player)
+		fmt.Printf("%s attacks you for %d damage. Your health: %d\n", monster.Name, monsterDamage, gs.Player.Health)
+		if !gs.Player.IsAlive() {
+			fmt.Println("You have been defeated! Game over.")
+			gs.GameOver = true
+			break
+		}
+	}
+}
+
+func (gs *GameState) UseItem(itemIndex int) {
+	if itemIndex < 0 || itemIndex >= len(gs.Items) {
+		fmt.Println("Invalid item index")
+		return
+	}
+	item := gs.Items[itemIndex]
+	switch item.Name {
+	case "Health Potion":
+		gs.Player.Heal(item.Value)
+		fmt.Printf("You used %s and restored %d health. Your health: %d\n", item.Name, item.Value, gs.Player.Health)
+	case "Strength Elixir":
+		gs.Player.Strength += item.Value
+		fmt.Printf("You used %s and increased strength by %d. Your strength: %d\n", item.Name, item.Value, gs.Player.Strength)
+	case "Agility Boots":
+		gs.Player.Agility += item.Value
+		fmt.Printf("You used %s and increased agility by %d. Your agility: %d\n", item.Name, item.Value, gs.Player.Agility)
+	default:
+		fmt.Println("Unknown item")
+	}
+	gs.Items = append(gs.Items[:itemIndex], gs.Items[itemIndex+1:]...)
+}
+
+func (gs *GameState) MoveToRoom(room string) {
+	gs.CurrentRoom = room
+	fmt.Printf("You moved to %s\n", room)
+}
+
+func (gs *GameState) Explore() {
+	fmt.Println("You explore the area...")
+	// Simulate finding something
+	if rand.Intn(100) < 30 {
+		newItem := NewItem("Mysterious Potion", "A potion with unknown effects", 25)
+		gs.Items = append(gs.Items, newItem)
+		fmt.Printf("You found a %s!\n", newItem.Name)
+	}
+}
+
 func main() {
-	// Initialize random seed
 	rand.Seed(time.Now().UnixNano())
-	
-	fmt.Println("🚀 Starting Fun Game Simulator 🚀")
-	fmt.Println("===================================")
-	
-	// Run the main game simulation
-	SimulateGame()
-	
-	// Demonstrate additional features
-	fmt.Println("\n" + strings.Repeat("=", 50))
-	fmt.Println("Additional Features Demonstration")
-	fmt.Println(strings.Repeat("=", 50))
-	
-	// Create a new game for demonstration
-	demoGame := NewGame()
-	demoGame.AddPlayer("Demo Player")
-	demoGame.Players[0].Score = 500
-	demoGame.Players[0].Level = 5
-	
-	// Show player stats
-	demoGame.Players[0].PlayerStats()
-	
-	// Show game statistics
-	demoGame.GameStatistics()
-	
-	// Demonstrate mathematical functions
-	fmt.Println("\nMathematical Functions:")
-	fmt.Printf("Fibonacci(10) = %d\n", Fibonacci(10))
-	fmt.Printf("Factorial(5) = %d\n", Factorial(5))
-	fmt.Printf("IsPrime(17) = %t\n", IsPrime(17))
-	fmt.Printf("GCD(48, 18) = %d\n", GCD(48, 18))
-	fmt.Printf("LCM(12, 18) = %d\n", LCM(12, 18))
-	
-	// Demonstrate string functions
-	fmt.Println("\nString Functions:")
-	testString := "Hello, World!"
-	fmt.Printf("Original: %s\n", testString)
-	fmt.Printf("Reversed: %s\n", ReverseString(testString))
-	fmt.Printf("Vowel count: %d\n", CountVowels(testString))
-	fmt.Printf("Is palindrome: %t\n", IsPalindrome("racecar"))
-	
-	// Demonstrate file operations
-	fmt.Println("\nFile Operations:")
-	fileHandler := NewFileHandler("game_log.txt")
-	fileHandler.WriteLine("Game started at " + time.Now().Format(time.RFC1123))
-	fileHandler.WriteLine("Player scores recorded")
-	fileHandler.ReadAll()
-	
-	// Demonstrate power-ups
-	fmt.Println("\nPower-up Demonstration:")
-	powerUps := CreatePowerUps()
-	testPlayer := &Player{Name: "Test Player", Score: 100, Level: 2}
-	testPlayer.PlayerStats()
-	testPlayer.UsePowerUp(powerUps[0]) // Double Score
-	testPlayer.UsePowerUp(powerUps[1]) // Level Boost
-	testPlayer.PlayerStats()
-	
-	// Complex game simulation with multiple rounds
-	fmt.Println("\n" + strings.Repeat("=", 50))
-	fmt.Println("Extended Game Simulation")
-	fmt.Println(strings.Repeat("=", 50))
-	
-	extendedGame := NewGame()
-	extendedGame.AddPlayer("Extended Player 1")
-	extendedGame.AddPlayer("Extended Player 2")
-	
-	for i := 0; i < 5; i++ {
-		extendedGame.StartRound()
+	game := InitGame()
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Println("Welcome to the Fun Game Simulator!")
+	fmt.Println("Type 'help' for a list of commands.")
+
+	for !game.GameOver {
+		fmt.Print("> ")
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+		args := strings.Fields(input)
+		if len(args) == 0 {
+			continue
+		}
+
+		switch args[0] {
+		case "help":
+			fmt.Println("Available commands:")
+			fmt.Println("  status - Display player status")
+			fmt.Println("  monsters - List monsters")
+			fmt.Println("  items - List items")
+			fmt.Println("  fight <monster_index> - Fight a monster")
+			fmt.Println("  use <item_index> - Use an item")
+			fmt.Println("  move <room> - Move to a different room")
+			fmt.Println("  explore - Explore the current room")
+			fmt.Println("  save <filename> - Save game")
+			fmt.Println("  load <filename> - Load game")
+			fmt.Println("  quit - Quit the game")
+		case "status":
+			game.DisplayStatus()
+		case "monsters":
+			game.DisplayMonsters()
+		case "items":
+			game.DisplayItems()
+		case "fight":
+			if len(args) < 2 {
+				fmt.Println("Usage: fight <monster_index>")
+			} else {
+				index, err := strconv.Atoi(args[1])
+				if err != nil {
+					fmt.Println("Invalid monster index")
+				} else {
+					game.Fight(index - 1)
+				}
+			}
+		case "use":
+			if len(args) < 2 {
+				fmt.Println("Usage: use <item_index>")
+			} else {
+				index, err := strconv.Atoi(args[1])
+				if err != nil {
+					fmt.Println("Invalid item index")
+				} else {
+					game.UseItem(index - 1)
+				}
+			}
+		case "move":
+			if len(args) < 2 {
+				fmt.Println("Usage: move <room>")
+			} else {
+				game.MoveToRoom(args[1])
+			}
+		case "explore":
+			game.Explore()
+		case "save":
+			if len(args) < 2 {
+				fmt.Println("Usage: save <filename>")
+			} else {
+				err := game.SaveGame(args[1])
+				if err != nil {
+					fmt.Printf("Error saving game: %v\n", err)
+				} else {
+					fmt.Println("Game saved successfully")
+				}
+			}
+		case "load":
+			if len(args) < 2 {
+				fmt.Println("Usage: load <filename>")
+			} else {
+				err := game.LoadGame(args[1])
+				if err != nil {
+					fmt.Printf("Error loading game: %v\n", err)
+				} else {
+					fmt.Println("Game loaded successfully")
+				}
+			}
+		case "quit":
+			fmt.Println("Thanks for playing!")
+			return
+		default:
+			fmt.Println("Unknown command. Type 'help' for a list of commands.")
+		}
 	}
-	
-	extendedGame.DisplayScores()
-	extendedGame.GameStatistics()
-	
-	// Reset and show it works
-	fmt.Println("\nResetting game...")
-	extendedGame.ResetGame()
-	extendedGame.DisplayScores()
-	
-	fmt.Println("\n🎊 Program completed successfully! 🎊")
-	fmt.Println("Thank you for using the Fun Game Simulator!")
+
+	if game.GameOver {
+		fmt.Println("Game over! Better luck next time.")
+	}
 }
