@@ -11,378 +11,199 @@ import (
 )
 
 type Player struct {
-	Name     string
-	Health   int
-	Mana     int
-	Strength int
-	Agility  int
-	Intellect int
-	Inventory []string
-	Gold     int
+	Name  string
+	Score int
 }
 
-type Monster struct {
-	Name     string
-	Health   int
-	Damage   int
-	Defense  int
-	Loot     []string
-	GoldDrop int
+type Game struct {
+	Players       []Player
+	CurrentPlayer int
+	Round         int
+	MaxRounds     int
 }
 
-type Item struct {
-	Name        string
-	Description string
-	Value       int
-	Type        string
+func (g *Game) AddPlayer(name string) {
+	g.Players = append(g.Players, Player{Name: name, Score: 0})
 }
 
-type Location struct {
-	Name        string
-	Description string
-	Monsters    []Monster
-	Items       []Item
-	Connections []string
+func (g *Game) NextPlayer() {
+	g.CurrentPlayer = (g.CurrentPlayer + 1) % len(g.Players)
 }
 
-var player Player
-var locations map[string]Location
-var currentLocation string
-
-func initGame() {
-	player = Player{
-		Name:     "Hero",
-		Health:   100,
-		Mana:     50,
-		Strength: 10,
-		Agility:  8,
-		Intellect: 6,
-		Inventory: []string{"Health Potion", "Mana Potion"},
-		Gold:     50,
-	}
-
-	locations = make(map[string]Location)
-
-	locations["forest"] = Location{
-		Name:        "Enchanted Forest",
-		Description: "A mystical forest filled with ancient trees and magical creatures.",
-		Monsters: []Monster{
-			{Name: "Goblin", Health: 30, Damage: 5, Defense: 2, Loot: []string{"Goblin Ear", "Rusty Dagger"}, GoldDrop: 10},
-			{Name: "Wolf", Health: 25, Damage: 8, Defense: 1, Loot: []string{"Wolf Pelt", "Sharp Fang"}, GoldDrop: 15},
-		},
-		Items: []Item{
-			{Name: "Health Potion", Description: "Restores 20 health", Value: 10, Type: "Consumable"},
-			{Name: "Mana Potion", Description: "Restores 15 mana", Value: 12, Type: "Consumable"},
-		},
-		Connections: []string{"village", "cave"},
-	}
-
-	locations["village"] = Location{
-		Name:        "Peaceful Village",
-		Description: "A small village with friendly inhabitants and a market.",
-		Monsters:    []Monster{},
-		Items: []Item{
-			{Name: "Iron Sword", Description: "A basic sword for combat", Value: 50, Type: "Weapon"},
-			{Name: "Leather Armor", Description: "Light armor for protection", Value: 40, Type: "Armor"},
-		},
-		Connections: []string{"forest"},
-	}
-
-	locations["cave"] = Location{
-		Name:        "Dark Cave",
-		Description: "A dark and dangerous cave with hidden treasures.",
-		Monsters: []Monster{
-			{Name: "Troll", Health: 80, Damage: 15, Defense: 5, Loot: []string{"Troll Hide", "Massive Club"}, GoldDrop: 50},
-			{Name: "Bat Swarm", Health: 20, Damage: 3, Defense: 0, Loot: []string{"Bat Wing"}, GoldDrop: 5},
-		},
-		Items: []Item{
-			{Name: "Treasure Chest", Description: "Contains valuable items", Value: 100, Type: "Container"},
-			{Name: "Magic Ring", Description: "Enhances intellect", Value: 75, Type: "Accessory"},
-		},
-		Connections: []string{"forest"},
-	}
-
-	currentLocation = "forest"
-}
-
-func displayStatus() {
-	fmt.Printf("\n=== Player Status ===\n")
-	fmt.Printf("Name: %s\n", player.Name)
-	fmt.Printf("Health: %d\n", player.Health)
-	fmt.Printf("Mana: %d\n", player.Mana)
-	fmt.Printf("Strength: %d\n", player.Strength)
-	fmt.Printf("Agility: %d\n", player.Agility)
-	fmt.Printf("Intellect: %d\n", player.Intellect)
-	fmt.Printf("Gold: %d\n", player.Gold)
-	fmt.Printf("Inventory: %v\n", player.Inventory)
-	fmt.Printf("Current Location: %s\n", locations[currentLocation].Name)
-}
-
-func displayLocation() {
-	loc := locations[currentLocation]
-	fmt.Printf("\n=== %s ===\n", loc.Name)
-	fmt.Printf("Description: %s\n", loc.Description)
-	if len(loc.Monsters) > 0 {
-		fmt.Printf("Monsters here: ")
-		for _, m := range loc.Monsters {
-			fmt.Printf("%s ", m.Name)
-		}
-		fmt.Println()
-	}
-	if len(loc.Items) > 0 {
-		fmt.Printf("Items here: ")
-		for _, item := range loc.Items {
-			fmt.Printf("%s ", item.Name)
-		}
-		fmt.Println()
-	}
-	fmt.Printf("Connections: %v\n", loc.Connections)
-}
-
-func moveTo(newLocation string) {
-	if !contains(locations[currentLocation].Connections, newLocation) {
-		fmt.Println("You cannot go there from here.")
-		return
-	}
-	currentLocation = newLocation
-	fmt.Printf("You have moved to %s.\n", locations[currentLocation].Name)
-}
-
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
-}
-
-func fightMonster() {
-	loc := locations[currentLocation]
-	if len(loc.Monsters) == 0 {
-		fmt.Println("There are no monsters here to fight.")
-		return
-	}
-
-	monster := loc.Monsters[rand.Intn(len(loc.Monsters))]
-	fmt.Printf("You encounter a %s!\n", monster.Name)
-
-	for player.Health > 0 && monster.Health > 0 {
-		fmt.Printf("\nYour Health: %d, %s's Health: %d\n", player.Health, monster.Name, monster.Health)
-		fmt.Println("Choose an action: (1) Attack (2) Use Item (3) Flee")
+func (g *Game) PlayRound() {
+	player := &g.Players[g.CurrentPlayer]
+	fmt.Printf("\nRound %d - %s's turn!\n", g.Round, player.Name)
+	
+	// Mini-game 1: Number Guessing
+	fmt.Println("Mini-game 1: Guess the number between 1 and 10")
+	target := rand.Intn(10) + 1
+	for i := 0; i < 3; i++ {
+		fmt.Print("Enter your guess: ")
 		reader := bufio.NewReader(os.Stdin)
 		input, _ := reader.ReadString('\n')
 		input = strings.TrimSpace(input)
-
-		switch input {
-		case "1":
-			playerDamage := player.Strength + rand.Intn(5)
-			actualDamage := playerDamage - monster.Defense
-			if actualDamage < 0 {
-				actualDamage = 0
-			}
-			monster.Health -= actualDamage
-			fmt.Printf("You attack the %s for %d damage!\n", monster.Name, actualDamage)
-
-			if monster.Health <= 0 {
-				fmt.Printf("You defeated the %s!\n", monster.Name)
-				player.Gold += monster.GoldDrop
-				if len(monster.Loot) > 0 {
-					loot := monster.Loot[rand.Intn(len(monster.Loot))]
-					player.Inventory = append(player.Inventory, loot)
-					fmt.Printf("You found: %s\n", loot)
-				}
-				break
-			}
-
-			monsterDamage := monster.Damage + rand.Intn(3)
-			player.Health -= monsterDamage
-			fmt.Printf("The %s attacks you for %d damage!\n", monster.Name, monsterDamage)
-
-			if player.Health <= 0 {
-				fmt.Println("You have been defeated! Game Over.")
-				return
-			}
-
-		case "2":
-			useItem()
-		case "3":
-			if rand.Float32() < 0.5 {
-				fmt.Println("You successfully fled from the battle!")
-				return
-			} else {
-				fmt.Println("You failed to flee!")
-				monsterDamage := monster.Damage + rand.Intn(3)
-				player.Health -= monsterDamage
-				fmt.Printf("The %s attacks you for %d damage!\n", monster.Name, monsterDamage)
-				if player.Health <= 0 {
-					fmt.Println("You have been defeated! Game Over.")
-					return
-				}
-			}
-		default:
-			fmt.Println("Invalid choice.")
+		guess, err := strconv.Atoi(input)
+		if err != nil {
+			fmt.Println("Invalid input! Please enter a number.")
+			continue
+		}
+		if guess == target {
+			fmt.Println("Correct! You earned 10 points.")
+			player.Score += 10
+			break
+		} else if guess < target {
+			fmt.Println("Too low!")
+		} else {
+			fmt.Println("Too high!")
 		}
 	}
-}
-
-func useItem() {
-	if len(player.Inventory) == 0 {
-		fmt.Println("You have no items to use.")
-		return
-	}
-
-	fmt.Println("Your inventory:")
-	for i, item := range player.Inventory {
-		fmt.Printf("%d: %s\n", i+1, item)
-	}
-	fmt.Println("Choose an item to use (number) or 0 to cancel:")
-
+	
+	// Mini-game 2: Rock Paper Scissors
+	fmt.Println("\nMini-game 2: Rock, Paper, Scissors")
+	choices := []string{"rock", "paper", "scissors"}
+	computerChoice := choices[rand.Intn(3)]
+	fmt.Print("Enter your choice (rock/paper/scissors): ")
 	reader := bufio.NewReader(os.Stdin)
 	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(input)
-	choice, err := strconv.Atoi(input)
-	if err != nil || choice < 0 || choice > len(player.Inventory) {
-		fmt.Println("Invalid choice.")
-		return
+	playerChoice := strings.TrimSpace(strings.ToLower(input))
+	
+	validChoice := false
+	for _, c := range choices {
+		if playerChoice == c {
+			validChoice = true
+			break
+		}
 	}
-
-	if choice == 0 {
-		return
-	}
-
-	itemName := player.Inventory[choice-1]
-	if itemName == "Health Potion" {
-		player.Health += 20
-		fmt.Println("You used a Health Potion and restored 20 health.")
-	} else if itemName == "Mana Potion" {
-		player.Mana += 15
-		fmt.Println("You used a Mana Potion and restored 15 mana.")
+	
+	if !validChoice {
+		fmt.Println("Invalid choice! No points awarded.")
 	} else {
-		fmt.Printf("You cannot use %s right now.\n", itemName)
-		return
+		fmt.Printf("Computer chose: %s\n", computerChoice)
+		if playerChoice == computerChoice {
+			fmt.Println("It's a tie! You earned 5 points.")
+			player.Score += 5
+		} else if (playerChoice == "rock" && computerChoice == "scissors") ||
+			(playerChoice == "paper" && computerChoice == "rock") ||
+			(playerChoice == "scissors" && computerChoice == "paper") {
+			fmt.Println("You win! You earned 15 points.")
+			player.Score += 15
+		} else {
+			fmt.Println("You lose! No points awarded.")
+		}
 	}
-
-	player.Inventory = append(player.Inventory[:choice-1], player.Inventory[choice:]...)
-}
-
-func pickUpItem() {
-	loc := locations[currentLocation]
-	if len(loc.Items) == 0 {
-		fmt.Println("There are no items here to pick up.")
-		return
-	}
-
-	item := loc.Items[rand.Intn(len(loc.Items))]
-	player.Inventory = append(player.Inventory, item.Name)
-	fmt.Printf("You picked up: %s\n", item.Name)
-	loc.Items = append(loc.Items[:0], loc.Items[1:]...)
-	locations[currentLocation] = loc
-}
-
-func shop() {
-	if currentLocation != "village" {
-		fmt.Println("There is no shop here.")
-		return
-	}
-
-	fmt.Println("\n=== Village Shop ===")
-	fmt.Println("Items for sale:")
-	fmt.Println("1. Health Potion - 10 gold")
-	fmt.Println("2. Mana Potion - 12 gold")
-	fmt.Println("3. Iron Sword - 50 gold")
-	fmt.Println("4. Leather Armor - 40 gold")
-	fmt.Println("Enter the number to buy or 0 to exit:")
-
-	reader := bufio.NewReader(os.Stdin)
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(input)
-	choice, err := strconv.Atoi(input)
-	if err != nil || choice < 0 || choice > 4 {
-		fmt.Println("Invalid choice.")
-		return
-	}
-
-	if choice == 0 {
-		return
-	}
-
-	var itemName string
-	var cost int
-	switch choice {
+	
+	// Mini-game 3: Math Quiz
+	fmt.Println("\nMini-game 3: Math Quiz")
+	a := rand.Intn(20) + 1
+	b := rand.Intn(20) + 1
+	operation := rand.Intn(3)
+	var answer int
+	var question string
+	
+	switch operation {
+	case 0:
+		question = fmt.Sprintf("What is %d + %d? ", a, b)
+		answer = a + b
 	case 1:
-		itemName = "Health Potion"
-		cost = 10
+		question = fmt.Sprintf("What is %d - %d? ", a, b)
+		answer = a - b
 	case 2:
-		itemName = "Mana Potion"
-		cost = 12
-	case 3:
-		itemName = "Iron Sword"
-		cost = 50
-	case 4:
-		itemName = "Leather Armor"
-		cost = 40
+		question = fmt.Sprintf("What is %d * %d? ", a, b)
+		answer = a * b
 	}
-
-	if player.Gold < cost {
-		fmt.Println("Not enough gold!")
-		return
+	
+	fmt.Print(question)
+	reader = bufio.NewReader(os.Stdin)
+	input, _ = reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+	userAnswer, err := strconv.Atoi(input)
+	if err != nil {
+		fmt.Println("Invalid input! No points awarded.")
+	} else if userAnswer == answer {
+		fmt.Println("Correct! You earned 20 points.")
+		player.Score += 20
+	} else {
+		fmt.Printf("Wrong! The correct answer was %d. No points awarded.\n", answer)
 	}
+	
+	g.NextPlayer()
+	g.Round++
+}
 
-	player.Gold -= cost
-	player.Inventory = append(player.Inventory, itemName)
-	fmt.Printf("You bought %s for %d gold.\n", itemName, cost)
+func (g *Game) DisplayScores() {
+	fmt.Println("\nCurrent Scores:")
+	for _, player := range g.Players {
+		fmt.Printf("%s: %d points\n", player.Name, player.Score)
+	}
+}
+
+func (g *Game) GetWinner() Player {
+	winner := g.Players[0]
+	for _, player := range g.Players {
+		if player.Score > winner.Score {
+			winner = player
+		}
+	}
+	return winner
 }
 
 func main() {
+	// Initialize random seed
 	rand.Seed(time.Now().UnixNano())
-	initGame()
-
-	fmt.Println("Welcome to the Fun Go Game!")
-	fmt.Println("You are an adventurer in a fantasy world.")
-	fmt.Println("Type 'help' for a list of commands.")
-
+	
+	// Create a new game
+	game := Game{
+		Players:       []Player{},
+		CurrentPlayer: 0,
+		Round:         1,
+		MaxRounds:     3,
+	}
+	
+	// Get player names
 	reader := bufio.NewReader(os.Stdin)
-
-	for {
-		fmt.Print("\n> ")
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(input)
-
-		switch input {
-		case "help":
-			fmt.Println("Available commands:")
-			fmt.Println("status - Show player status")
-			fmt.Println("look - Describe current location")
-			fmt.Println("go [location] - Move to a connected location")
-			fmt.Println("fight - Fight a monster")
-			fmt.Println("pickup - Pick up an item")
-			fmt.Println("use - Use an item from inventory")
-			fmt.Println("shop - Buy items in the village")
-			fmt.Println("quit - Exit the game")
-		case "status":
-			displayStatus()
-		case "look":
-			displayLocation()
-		case "go forest":
-			moveTo("forest")
-		case "go village":
-			moveTo("village")
-		case "go cave":
-			moveTo("cave")
-		case "fight":
-			fightMonster()
-		case "pickup":
-			pickUpItem()
-		case "use":
-			useItem()
-		case "shop":
-			shop()
-		case "quit":
-			fmt.Println("Thanks for playing!")
-			return
-		default:
-			fmt.Println("Unknown command. Type 'help' for a list of commands.")
+	fmt.Println("Welcome to the Fun Go Game!")
+	fmt.Print("Enter number of players (1-4): ")
+	input, _ := reader.ReadString('\n')
+	numPlayers, err := strconv.Atoi(strings.TrimSpace(input))
+	if err != nil || numPlayers < 1 || numPlayers > 4 {
+		fmt.Println("Invalid number of players! Using default of 2.")
+		numPlayers = 2
+	}
+	
+	for i := 0; i < numPlayers; i++ {
+		fmt.Printf("Enter name for player %d: ", i+1)
+		name, _ := reader.ReadString('\n')
+		name = strings.TrimSpace(name)
+		if name == "" {
+			name = fmt.Sprintf("Player %d", i+1)
 		}
+		game.AddPlayer(name)
+	}
+	
+	// Play the game
+	fmt.Printf("\nStarting game with %d players for %d rounds!\n", len(game.Players), game.MaxRounds)
+	
+	for game.Round <= game.MaxRounds {
+		game.PlayRound()
+		game.DisplayScores()
+		
+		if game.Round <= game.MaxRounds {
+			fmt.Print("\nPress Enter to continue to next round...")
+			reader.ReadString('\n')
+		}
+	}
+	
+	// Determine winner
+	winner := game.GetWinner()
+	fmt.Printf("\nGame Over! The winner is %s with %d points!\n", winner.Name, winner.Score)
+	
+	// Ask if players want to play again
+	fmt.Print("\nWould you like to play again? (y/n): ")
+	input, _ = reader.ReadString('\n')
+	if strings.TrimSpace(strings.ToLower(input)) == "y" {
+		fmt.Println("\nRestarting game...")
+		main()
+	} else {
+		fmt.Println("Thanks for playing!")
 	}
 }
