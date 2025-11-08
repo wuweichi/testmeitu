@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math/rand"
 	"time"
+	"strconv"
+	"strings"
 )
 
 type Character struct {
@@ -14,45 +16,60 @@ type Character struct {
 	Defense   int
 	Level     int
 	Exp       int
+	Inventory []string
+	Gold      int
 }
 
-type Enemy struct {
+type Monster struct {
 	Name      string
 	Health    int
 	Attack    int
 	Defense   int
 	ExpReward int
+	GoldReward int
 }
 
 type Item struct {
 	Name        string
 	Description string
-	Effect      func(*Character)
+	Value       int
+	Type        string
 }
 
-type GameState struct {
-	Player      Character
-	Enemies     []Enemy
-	Inventory   []Item
-	CurrentRoom int
-	GameOver    bool
+func (c *Character) DisplayStatus() {
+	fmt.Printf("=== %s's Status ===\n", c.Name)
+	fmt.Printf("Level: %d\n", c.Level)
+	fmt.Printf("Health: %d/%d\n", c.Health, c.MaxHealth)
+	fmt.Printf("Attack: %d\n", c.Attack)
+	fmt.Printf("Defense: %d\n", c.Defense)
+	fmt.Printf("Experience: %d/%d\n", c.Exp, c.Level*100)
+	fmt.Printf("Gold: %d\n", c.Gold)
+	fmt.Printf("Inventory: %v\n", c.Inventory)
+	fmt.Println("===================")
 }
 
-func (c *Character) TakeDamage(damage int) {
-	actualDamage := damage - c.Defense
-	if actualDamage < 0 {
-		actualDamage = 0
+func (c *Character) AttackMonster(m *Monster) int {
+	damage := c.Attack - m.Defense
+	if damage < 1 {
+		damage = 1
 	}
-	c.Health -= actualDamage
-	if c.Health < 0 {
-		c.Health = 0
-	}
+	m.Health -= damage
+	return damage
 }
 
-func (c *Character) Heal(amount int) {
-	c.Health += amount
-	if c.Health > c.MaxHealth {
-		c.Health = c.MaxHealth
+func (m *Monster) AttackCharacter(c *Character) int {
+	damage := m.Attack - c.Defense
+	if damage < 1 {
+		damage = 1
+	}
+	c.Health -= damage
+	return damage
+}
+
+func (c *Character) GainExp(exp int) {
+	c.Exp += exp
+	for c.Exp >= c.Level*100 {
+		c.LevelUp()
 	}
 }
 
@@ -62,30 +79,162 @@ func (c *Character) LevelUp() {
 	c.Health = c.MaxHealth
 	c.Attack += 2
 	c.Defense += 1
-	fmt.Printf("Level up! %s is now level %d\n", c.Name, c.Level)
+	c.Exp = 0
+	fmt.Printf("🎉 %s leveled up to level %d!\n", c.Name, c.Level)
 }
 
-func (c *Character) GainExp(exp int) {
-	c.Exp += exp
-	if c.Exp >= c.Level*100 {
-		c.LevelUp()
-		c.Exp = 0
+func (c *Character) AddItem(item string) {
+	c.Inventory = append(c.Inventory, item)
+	fmt.Printf("📦 Added %s to inventory.\n", item)
+}
+
+func (c *Character) UseItem(itemName string) bool {
+	for i, item := range c.Inventory {
+		if item == itemName {
+			c.Inventory = append(c.Inventory[:i], c.Inventory[i+1:]...)
+			fmt.Printf("✅ Used %s.\n", itemName)
+			return true
+		}
+	}
+	fmt.Printf("❌ Item %s not found in inventory.\n", itemName)
+	return false
+}
+
+func GenerateMonster(level int) Monster {
+	monsters := []Monster{
+		{Name: "Goblin", Health: 20 + level*5, Attack: 5 + level, Defense: 2 + level/2, ExpReward: 10 + level*2, GoldReward: 5 + level},
+		{Name: "Orc", Health: 30 + level*8, Attack: 8 + level*2, Defense: 5 + level, ExpReward: 20 + level*3, GoldReward: 10 + level*2},
+		{Name: "Dragon", Health: 50 + level*15, Attack: 15 + level*3, Defense: 10 + level*2, ExpReward: 50 + level*5, GoldReward: 25 + level*3},
+	}
+	return monsters[rand.Intn(len(monsters))]
+}
+
+func Battle(c *Character, m *Monster) bool {
+	fmt.Printf("⚔️  A wild %s appears!\n", m.Name)
+	for c.Health > 0 && m.Health > 0 {
+		fmt.Printf("\n%s: %d HP | %s: %d HP\n", c.Name, c.Health, m.Name, m.Health)
+		fmt.Print("Choose action: (1) Attack (2) Use Item (3) Flee: ")
+		var choice int
+		fmt.Scan(&choice)
+		switch choice {
+		case 1:
+			damage := c.AttackMonster(m)
+			fmt.Printf("💥 %s attacks %s for %d damage!\n", c.Name, m.Name, damage)
+			if m.Health <= 0 {
+				fmt.Printf("🎊 %s defeated the %s!\n", c.Name, m.Name)
+				c.GainExp(m.ExpReward)
+				c.Gold += m.GoldReward
+				fmt.Printf("💰 Gained %d gold.\n", m.GoldReward)
+				return true
+			}
+			mDamage := m.AttackCharacter(c)
+			fmt.Printf("💢 %s attacks %s for %d damage!\n", m.Name, c.Name, mDamage)
+			if c.Health <= 0 {
+				fmt.Printf("💀 %s has been defeated...\n", c.Name)
+				return false
+			}
+		case 2:
+			if len(c.Inventory) == 0 {
+				fmt.Println("❌ No items in inventory.")
+				continue
+			}
+			fmt.Printf("Inventory: %v\n", c.Inventory)
+			fmt.Print("Enter item name to use: ")
+			var item string
+			fmt.Scan(&item)
+			if c.UseItem(item) {
+				if item == "Health Potion" {
+					healAmount := 20
+					c.Health += healAmount
+					if c.Health > c.MaxHealth {
+						c.Health = c.MaxHealth
+					}
+					fmt.Printf("❤️  Restored %d health. Current health: %d\n", healAmount, c.Health)
+				}
+			}
+		case 3:
+			fmt.Println("🏃 Fleeing from battle...")
+			return false
+		default:
+			fmt.Println("❌ Invalid choice.")
+		}
+	}
+	return false
+}
+
+func Shop(c *Character) {
+	items := map[string]int{
+		"Health Potion": 10,
+		"Attack Boost": 20,
+		"Defense Boost": 15,
+	}
+	fmt.Println("🏪 Welcome to the Shop!")
+	for {
+		fmt.Println("Available items:")
+		for item, price := range items {
+			fmt.Printf("- %s: %d gold\n", item, price)
+		}
+		fmt.Printf("Your gold: %d\n", c.Gold)
+		fmt.Print("Enter item name to buy (or 'exit' to leave): ")
+		var choice string
+		fmt.Scan(&choice)
+		if strings.ToLower(choice) == "exit" {
+			break
+		}
+		if price, exists := items[choice]; exists {
+			if c.Gold >= price {
+				c.Gold -= price
+				c.AddItem(choice)
+				fmt.Printf("✅ Purchased %s for %d gold.\n", choice, price)
+			} else {
+				fmt.Println("❌ Not enough gold.")
+			}
+		} else {
+			fmt.Println("❌ Item not available.")
+		}
 	}
 }
 
-func (e *Enemy) TakeDamage(damage int) {
-	actualDamage := damage - e.Defense
-	if actualDamage < 0 {
-		actualDamage = 0
+func Explore(c *Character) {
+	events := []string{
+		"You find a treasure chest!",
+		"You discover a hidden path.",
+		"You encounter a mysterious stranger.",
+		"You stumble upon an ancient ruin.",
 	}
-	e.Health -= actualDamage
-	if e.Health < 0 {
-		e.Health = 0
+	event := events[rand.Intn(len(events))]
+	fmt.Println(event)
+	switch rand.Intn(4) {
+	case 0:
+		goldFound := rand.Intn(20) + 5
+		c.Gold += goldFound
+		fmt.Printf("💰 Found %d gold!\n", goldFound)
+	case 1:
+		item := "Health Potion"
+		c.AddItem(item)
+		fmt.Printf("📦 Found a %s!\n", item)
+	case 2:
+		monster := GenerateMonster(c.Level)
+		Battle(c, &monster)
+	case 3:
+		fmt.Println("Nothing interesting happens.")
 	}
 }
 
-func CreatePlayer(name string) Character {
-	return Character{
+func main() {
+	// Initialize random seed
+	rand.Seed(time.Now().UnixNano())
+
+	// Welcome message
+	fmt.Println("🎮 Welcome to the Complex Game Simulator!")
+	fmt.Println("Create your character:")
+
+	// Character creation
+	var name string
+	fmt.Print("Enter character name: ")
+	fmt.Scan(&name)
+
+	player := Character{
 		Name:      name,
 		Health:    100,
 		MaxHealth: 100,
@@ -93,239 +242,53 @@ func CreatePlayer(name string) Character {
 		Defense:   5,
 		Level:     1,
 		Exp:       0,
+		Inventory: []string{"Health Potion"},
+		Gold:      50,
 	}
-}
 
-func CreateEnemy(name string, health, attack, defense, expReward int) Enemy {
-	return Enemy{
-		Name:      name,
-		Health:    health,
-		Attack:    attack,
-		Defense:   defense,
-		ExpReward: expReward,
-	}
-}
+	fmt.Printf("🌟 Character %s created!\n", player.Name)
+	player.DisplayStatus()
 
-func CreateHealthPotion() Item {
-	return Item{
-		Name:        "Health Potion",
-		Description: "Restores 30 health points.",
-		Effect: func(c *Character) {
-			c.Heal(30)
-			fmt.Printf("%s used a Health Potion and restored 30 health. Current health: %d\n", c.Name, c.Health)
-		},
-	}
-}
+	// Main game loop
+	for {
+		fmt.Println("\n=== Main Menu ===")
+		fmt.Println("1. Explore")
+		fmt.Println("2. Battle")
+		fmt.Println("3. Shop")
+		fmt.Println("4. Status")
+		fmt.Println("5. Quit")
+		fmt.Print("Choose an option: ")
 
-func CreateAttackBoost() Item {
-	return Item{
-		Name:        "Attack Boost",
-		Description: "Increases attack by 5 for the next battle.",
-		Effect: func(c *Character) {
-			c.Attack += 5
-			fmt.Printf("%s used an Attack Boost. Attack increased by 5. Current attack: %d\n", c.Name, c.Attack)
-		},
-	}
-}
-
-func CreateDefenseBoost() Item {
-	return Item{
-		Name:        "Defense Boost",
-		Description: "Increases defense by 3 for the next battle.",
-		Effect: func(c *Character) {
-			c.Defense += 3
-			fmt.Printf("%s used a Defense Boost. Defense increased by 3. Current defense: %d\n", c.Name, c.Defense)
-		},
-	}
-}
-
-func InitializeGame() GameState {
-	player := CreatePlayer("Hero")
-	enemies := []Enemy{
-		CreateEnemy("Goblin", 50, 8, 2, 20),
-		CreateEnemy("Orc", 80, 12, 4, 40),
-		CreateEnemy("Dragon", 150, 20, 8, 100),
-	}
-	inventory := []Item{
-		CreateHealthPotion(),
-		CreateAttackBoost(),
-		CreateDefenseBoost(),
-	}
-	return GameState{
-		Player:      player,
-		Enemies:     enemies,
-		Inventory:   inventory,
-		CurrentRoom: 0,
-		GameOver:    false,
-	}
-}
-
-func (gs *GameState) DisplayStatus() {
-	fmt.Printf("=== Player Status ===\n")
-	fmt.Printf("Name: %s\n", gs.Player.Name)
-	fmt.Printf("Health: %d/%d\n", gs.Player.Health, gs.Player.MaxHealth)
-	fmt.Printf("Attack: %d\n", gs.Player.Attack)
-	fmt.Printf("Defense: %d\n", gs.Player.Defense)
-	fmt.Printf("Level: %d\n", gs.Player.Level)
-	fmt.Printf("Exp: %d/%d\n", gs.Player.Exp, gs.Player.Level*100)
-	fmt.Printf("Current Room: %d\n", gs.CurrentRoom)
-	fmt.Printf("=====================\n")
-}
-
-func (gs *GameState) DisplayInventory() {
-	fmt.Printf("=== Inventory ===\n")
-	for i, item := range gs.Inventory {
-		fmt.Printf("%d. %s - %s\n", i+1, item.Name, item.Description)
-	}
-	fmt.Printf("=================\n")
-}
-
-func (gs *GameState) UseItem(index int) {
-	if index < 0 || index >= len(gs.Inventory) {
-		fmt.Println("Invalid item index.")
-		return
-	}
-	item := gs.Inventory[index]
-	item.Effect(&gs.Player)
-	gs.Inventory = append(gs.Inventory[:index], gs.Inventory[index+1:]...)
-}
-
-func (gs *GameState) Battle(enemyIndex int) {
-	if enemyIndex < 0 || enemyIndex >= len(gs.Enemies) {
-		fmt.Println("Invalid enemy index.")
-		return
-	}
-	enemy := &gs.Enemies[enemyIndex]
-	fmt.Printf("A wild %s appears!\n", enemy.Name)
-	for gs.Player.Health > 0 && enemy.Health > 0 {
-		fmt.Printf("\n--- Battle Round ---\n")
-		fmt.Printf("%s: %d HP\n", gs.Player.Name, gs.Player.Health)
-		fmt.Printf("%s: %d HP\n", enemy.Name, enemy.Health)
-		fmt.Println("1. Attack")
-		fmt.Println("2. Use Item")
-		fmt.Println("3. Flee")
 		var choice int
-		fmt.Print("Choose an action: ")
 		fmt.Scan(&choice)
+
 		switch choice {
 		case 1:
-			playerDamage := gs.Player.Attack + rand.Intn(5)
-			enemy.TakeDamage(playerDamage)
-			fmt.Printf("%s attacks %s for %d damage!\n", gs.Player.Name, enemy.Name, playerDamage)
-			if enemy.Health <= 0 {
-				fmt.Printf("%s defeated the %s!\n", gs.Player.Name, enemy.Name)
-				gs.Player.GainExp(enemy.ExpReward)
-				gs.Enemies = append(gs.Enemies[:enemyIndex], gs.Enemies[enemyIndex+1:]...)
-				return
-			}
-			enemyDamage := enemy.Attack + rand.Intn(3)
-			gs.Player.TakeDamage(enemyDamage)
-			fmt.Printf("%s attacks %s for %d damage!\n", enemy.Name, gs.Player.Name, enemyDamage)
-			if gs.Player.Health <= 0 {
-				fmt.Printf("%s has been defeated! Game Over.\n", gs.Player.Name)
-				gs.GameOver = true
-				return
-			}
+			Explore(&player)
 		case 2:
-			gs.DisplayInventory()
-			var itemChoice int
-			fmt.Print("Choose an item to use: ")
-			fmt.Scan(&itemChoice)
-			gs.UseItem(itemChoice - 1)
+			monster := GenerateMonster(player.Level)
+			Battle(&player, &monster)
 		case 3:
-			fmt.Printf("%s fled from the battle!\n", gs.Player.Name)
+			Shop(&player)
+		case 4:
+			player.DisplayStatus()
+		case 5:
+			fmt.Println("👋 Thanks for playing!")
 			return
 		default:
-			fmt.Println("Invalid choice. Please try again.")
+			fmt.Println("❌ Invalid choice.")
 		}
-	}
-}
 
-func (gs *GameState) Explore() {
-	fmt.Println("You are exploring the area...")
-	randomEvent := rand.Intn(3)
-	switch randomEvent {
-	case 0:
-		fmt.Println("You found a treasure chest!")
-		newItem := CreateHealthPotion()
-		gs.Inventory = append(gs.Inventory, newItem)
-		fmt.Printf("You obtained a %s!\n", newItem.Name)
-	case 1:
-		if len(gs.Enemies) > 0 {
-			enemyIndex := rand.Intn(len(gs.Enemies))
-			gs.Battle(enemyIndex)
-		} else {
-			fmt.Println("You found a peaceful clearing. No enemies here.")
-		}
-	case 2:
-		fmt.Println("You discovered a hidden shrine. Your stats are boosted!")
-		gs.Player.Attack += 2
-		gs.Player.Defense += 1
-		fmt.Printf("Attack increased by 2, Defense increased by 1. Current stats: Attack=%d, Defense=%d\n", gs.Player.Attack, gs.Player.Defense)
-	}
-}
-
-func (gs *GameState) MoveToNextRoom() {
-	if gs.CurrentRoom >= 2 {
-		fmt.Println("You have reached the final room. Defeat the boss to win!")
-		return
-	}
-	gs.CurrentRoom++
-	fmt.Printf("You moved to room %d.\n", gs.CurrentRoom)
-	if gs.CurrentRoom == 2 {
-		fmt.Println("This is the boss room! Prepare for a tough battle.")
-	}
-}
-
-func (gs *GameState) SaveGame() {
-	fmt.Println("Game saved successfully.")
-}
-
-func (gs *GameState) LoadGame() {
-	fmt.Println("Game loaded successfully.")
-}
-
-func main() {
-	rand.Seed(time.Now().UnixNano())
-	game := InitializeGame()
-	fmt.Println("Welcome to the Complex Game Simulator!")
-	fmt.Println("You are a hero on a quest to defeat monsters and level up.")
-	fmt.Println("Commands: status, inventory, use <item_index>, battle <enemy_index>, explore, move, save, load, quit")
-	for !game.GameOver {
-		fmt.Print("\nEnter command: ")
-		var command string
-		fmt.Scan(&command)
-		switch command {
-		case "status":
-			game.DisplayStatus()
-		case "inventory":
-			game.DisplayInventory()
-		case "use":
-			var index int
-			fmt.Scan(&index)
-			game.UseItem(index - 1)
-		case "battle":
-			var index int
-			fmt.Scan(&index)
-			game.Battle(index - 1)
-		case "explore":
-			game.Explore()
-		case "move":
-			game.MoveToNextRoom()
-		case "save":
-			game.SaveGame()
-		case "load":
-			game.LoadGame()
-		case "quit":
-			fmt.Println("Thanks for playing!")
+		// Check if player is dead
+		if player.Health <= 0 {
+			fmt.Println("\n💀 Game Over!")
+			fmt.Print("Play again? (y/n): ")
+			var restart string
+			fmt.Scan(&restart)
+			if strings.ToLower(restart) == "y" {
+				main()
+			}
 			return
-		default:
-			fmt.Println("Unknown command. Please try again.")
-		}
-		if len(game.Enemies) == 0 && game.CurrentRoom >= 2 {
-			fmt.Println("Congratulations! You have defeated all enemies and won the game!")
-			game.GameOver = true
 		}
 	}
-	fmt.Println("Game Over.")
 }
