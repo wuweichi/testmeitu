@@ -4,10 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"time"
-	"strconv"
-	"strings"
-	"os"
-	"bufio"
 )
 
 type Character struct {
@@ -17,22 +13,29 @@ type Character struct {
 	Attack    int
 	Defense   int
 	Level     int
-	Experience int
+	Exp       int
 	Inventory []string
 }
 
-type Enemy struct {
-	Name    string
-	Health  int
-	Attack  int
-	Defense int
-}
-
-type GameWorld struct {
-	Player    Character
-	Enemies   []Enemy
-	Locations []string
-	CurrentLocation int
+func (c *Character) DisplayStats() {
+	fmt.Printf("Name: %s\n", c.Name)
+	fmt.Printf("Level: %d\n", c.Level)
+	fmt.Printf("Health: %d/%d\n", c.Health, c.MaxHealth)
+	fmt.Printf("Attack: %d\n", c.Attack)
+	fmt.Printf("Defense: %d\n", c.Defense)
+	fmt.Printf("Experience: %d\n", c.Exp)
+	fmt.Print("Inventory: ")
+	if len(c.Inventory) == 0 {
+		fmt.Println("Empty")
+	} else {
+		for i, item := range c.Inventory {
+			if i > 0 {
+				fmt.Print(", ")
+			}
+			fmt.Print(item)
+		}
+		fmt.Println()
+	}
 }
 
 func (c *Character) LevelUp() {
@@ -41,291 +44,269 @@ func (c *Character) LevelUp() {
 	c.Health = c.MaxHealth
 	c.Attack += 2
 	c.Defense += 1
-	fmt.Printf("Congratulations! %s leveled up to level %d!\n", c.Name, c.Level)
+	fmt.Printf("%s leveled up to level %d!\n", c.Name, c.Level)
 }
 
-func (c *Character) GainExperience(exp int) {
-	c.Experience += exp
-	fmt.Printf("%s gained %d experience points. Total: %d\n", c.Name, exp, c.Experience)
-	for c.Experience >= c.Level*100 {
+func (c *Character) GainExp(amount int) {
+	c.Exp += amount
+	fmt.Printf("%s gained %d experience points.\n", c.Name, amount)
+	for c.Exp >= c.Level*100 {
+		c.Exp -= c.Level * 100
 		c.LevelUp()
 	}
 }
 
+func (c *Character) IsAlive() bool {
+	return c.Health > 0
+}
+
+func (c *Character) AttackTarget(target *Character) {
+	damage := c.Attack - target.Defense
+	if damage < 1 {
+		damage = 1
+	}
+	target.Health -= damage
+	fmt.Printf("%s attacks %s for %d damage!\n", c.Name, target.Name, damage)
+	if !target.IsAlive() {
+		fmt.Printf("%s has been defeated!\n", target.Name)
+		c.GainExp(target.Level * 10)
+	}
+}
+
+func (c *Character) Heal(amount int) {
+	c.Health += amount
+	if c.Health > c.MaxHealth {
+		c.Health = c.MaxHealth
+	}
+	fmt.Printf("%s healed for %d health. Current health: %d/%d\n", c.Name, amount, c.Health, c.MaxHealth)
+}
+
 func (c *Character) AddItem(item string) {
 	c.Inventory = append(c.Inventory, item)
-	fmt.Printf("Added %s to inventory.\n", item)
+	fmt.Printf("%s added to inventory.\n", item)
 }
 
-func (c *Character) UseItem(itemName string) bool {
-	for i, item := range c.Inventory {
-		if item == itemName {
-			c.Inventory = append(c.Inventory[:i], c.Inventory[i+1:]...)
-			fmt.Printf("Used %s.\n", itemName)
-			return true
-		}
+func (c *Character) UseItem(itemIndex int) {
+	if itemIndex < 0 || itemIndex >= len(c.Inventory) {
+		fmt.Println("Invalid item index.")
+		return
 	}
-	fmt.Printf("Item %s not found in inventory.\n", itemName)
-	return false
+	item := c.Inventory[itemIndex]
+	c.Inventory = append(c.Inventory[:itemIndex], c.Inventory[itemIndex+1:]...)
+	switch item {
+	case "Health Potion":
+		c.Heal(30)
+	case "Attack Boost":
+		c.Attack += 5
+		fmt.Printf("%s's attack increased by 5!\n", c.Name)
+	case "Defense Boost":
+		c.Defense += 5
+		fmt.Printf("%s's defense increased by 5!\n", c.Name)
+	default:
+		fmt.Printf("Used %s.\n", item)
+	}
 }
 
-func (c *Character) DisplayStatus() {
-	fmt.Printf("Name: %s\n", c.Name)
-	fmt.Printf("Level: %d\n", c.Level)
-	fmt.Printf("Health: %d/%d\n", c.Health, c.MaxHealth)
-	fmt.Printf("Attack: %d\n", c.Attack)
-	fmt.Printf("Defense: %d\n", c.Defense)
-	fmt.Printf("Experience: %d\n", c.Experience)
-	fmt.Printf("Inventory: %v\n", c.Inventory)
+type Enemy struct {
+	Name    string
+	Health  int
+	Attack  int
+	Defense int
+	Level   int
 }
 
-func (e *Enemy) DisplayStatus() {
+func (e *Enemy) DisplayStats() {
 	fmt.Printf("Enemy: %s\n", e.Name)
+	fmt.Printf("Level: %d\n", e.Level)
 	fmt.Printf("Health: %d\n", e.Health)
 	fmt.Printf("Attack: %d\n", e.Attack)
 	fmt.Printf("Defense: %d\n", e.Defense)
 }
 
-func (gw *GameWorld) DisplayLocation() {
-	fmt.Printf("Current Location: %s\n", gw.Locations[gw.CurrentLocation])
+func (e *Enemy) IsAlive() bool {
+	return e.Health > 0
 }
 
-func (gw *GameWorld) MoveToLocation(locationIndex int) {
-	if locationIndex >= 0 && locationIndex < len(gw.Locations) {
-		gw.CurrentLocation = locationIndex
-		fmt.Printf("Moved to %s.\n", gw.Locations[locationIndex])
-	} else {
-		fmt.Println("Invalid location.")
+func (e *Enemy) AttackTarget(target *Character) {
+	damage := e.Attack - target.Defense
+	if damage < 1 {
+		damage = 1
+	}
+	target.Health -= damage
+	fmt.Printf("%s attacks %s for %d damage!\n", e.Name, target.Name, damage)
+	if !target.IsAlive() {
+		fmt.Printf("%s has been defeated!\n", target.Name)
 	}
 }
 
-func (gw *GameWorld) GenerateEnemies() {
-	gw.Enemies = []Enemy{}
-	rand.Seed(time.Now().UnixNano())
-	numEnemies := rand.Intn(3) + 1
-	enemyNames := []string{"Goblin", "Orc", "Skeleton", "Zombie", "Dragon"}
-	for i := 0; i < numEnemies; i++ {
-		name := enemyNames[rand.Intn(len(enemyNames))]
-		health := rand.Intn(50) + 20
-		attack := rand.Intn(10) + 5
-		defense := rand.Intn(5) + 1
-		gw.Enemies = append(gw.Enemies, Enemy{Name: name, Health: health, Attack: attack, Defense: defense})
+func GenerateRandomEnemy(level int) *Enemy {
+	names := []string{"Goblin", "Orc", "Skeleton", "Zombie", "Dragon", "Troll"}
+	name := names[rand.Intn(len(names))]
+	health := 20 + (level * 5)
+	attack := 5 + (level * 2)
+	defense := 2 + level
+	return &Enemy{
+		Name:    name,
+		Health:  health,
+		Attack:  attack,
+		Defense: defense,
+		Level:   level,
 	}
-	fmt.Printf("Generated %d enemies in this location.\n", numEnemies)
 }
 
-func (gw *GameWorld) Battle() {
-	if len(gw.Enemies) == 0 {
-		fmt.Println("No enemies to battle.")
-		return
+type Game struct {
+	Player *Character
+	Round  int
+}
+
+func NewGame(playerName string) *Game {
+	player := &Character{
+		Name:      playerName,
+		Health:    100,
+		MaxHealth: 100,
+		Attack:    10,
+		Defense:   5,
+		Level:     1,
+		Exp:       0,
+		Inventory: []string{"Health Potion", "Health Potion"},
 	}
-	fmt.Println("Battle started!")
-	for len(gw.Enemies) > 0 && gw.Player.Health > 0 {
+	return &Game{
+		Player: player,
+		Round:  1,
+	}
+}
+
+func (g *Game) StartBattle() {
+	enemyLevel := g.Player.Level + rand.Intn(3) - 1
+	if enemyLevel < 1 {
+		enemyLevel = 1
+	}
+	enemy := GenerateRandomEnemy(enemyLevel)
+	fmt.Printf("\n--- Round %d: Battle Start! ---\n", g.Round)
+	fmt.Printf("A wild %s (Level %d) appears!\n", enemy.Name, enemy.Level)
+	for g.Player.IsAlive() && enemy.IsAlive() {
 		fmt.Println("\n--- Your Turn ---")
-		gw.Player.DisplayStatus()
-		fmt.Println("Enemies:")
-		for i, enemy := range gw.Enemies {
-			fmt.Printf("%d: ", i)
-			enemy.DisplayStatus()
+		g.PlayerTurn(enemy)
+		if !enemy.IsAlive() {
+			break
 		}
-		fmt.Print("Choose an enemy to attack (by index) or 'run' to escape: ")
-		reader := bufio.NewReader(os.Stdin)
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(input)
-		if input == "run" {
-			fmt.Println("You escaped from the battle!")
+		fmt.Println("\n--- Enemy Turn ---")
+		enemy.AttackTarget(g.Player)
+	}
+	if g.Player.IsAlive() {
+		fmt.Printf("\nYou defeated the %s!\n", enemy.Name)
+		g.Round++
+		// Chance to find item after battle
+		if rand.Intn(100) < 30 {
+			items := []string{"Health Potion", "Attack Boost", "Defense Boost"}
+			foundItem := items[rand.Intn(len(items))]
+			g.Player.AddItem(foundItem)
+		}
+	} else {
+		fmt.Println("\nGame Over! You have been defeated.")
+	}
+}
+
+func (g *Game) PlayerTurn(enemy *Enemy) {
+	for {
+		fmt.Println("Choose an action:")
+		fmt.Println("1. Attack")
+		fmt.Println("2. Use Item")
+		fmt.Println("3. Check Stats")
+		fmt.Println("4. Flee")
+		var choice int
+		fmt.Scan(&choice)
+		switch choice {
+		case 1:
+			g.Player.AttackTarget(enemy)
 			return
-		}
-		index, err := strconv.Atoi(input)
-		if err != nil || index < 0 || index >= len(gw.Enemies) {
-			fmt.Println("Invalid enemy index.")
+		case 2:
+			g.UseItemMenu()
 			continue
-		}
-		playerDamage := gw.Player.Attack - gw.Enemies[index].Defense
-		if playerDamage < 0 {
-			playerDamage = 0
-		}
-		gw.Enemies[index].Health -= playerDamage
-		fmt.Printf("You attacked %s for %d damage.\n", gw.Enemies[index].Name, playerDamage)
-		if gw.Enemies[index].Health <= 0 {
-			fmt.Printf("%s defeated!\n", gw.Enemies[index].Name)
-			gw.Player.GainExperience(20)
-			gw.Enemies = append(gw.Enemies[:index], gw.Enemies[index+1:]...)
-			if len(gw.Enemies) == 0 {
-				fmt.Println("All enemies defeated!")
-				gw.Player.AddItem("Gold")
+		case 3:
+			fmt.Println("\n--- Your Stats ---")
+			g.Player.DisplayStats()
+			fmt.Println("\n--- Enemy Stats ---")
+			enemy.DisplayStats()
+			continue
+		case 4:
+			if rand.Intn(100) < 50 {
+				fmt.Println("You successfully fled from the battle!")
+				g.Round++
+				return
+			} else {
+				fmt.Println("You failed to flee!")
 				return
 			}
-		} else {
-			fmt.Printf("%s has %d health remaining.\n", gw.Enemies[index].Name, gw.Enemies[index].Health)
-		}
-		if len(gw.Enemies) > 0 {
-			fmt.Println("\n--- Enemy Turn ---")
-			for i := 0; i < len(gw.Enemies); i++ {
-				enemyDamage := gw.Enemies[i].Attack - gw.Player.Defense
-				if enemyDamage < 0 {
-					enemyDamage = 0
-				}
-				gw.Player.Health -= enemyDamage
-				fmt.Printf("%s attacked you for %d damage.\n", gw.Enemies[i].Name, enemyDamage)
-				if gw.Player.Health <= 0 {
-					fmt.Println("You have been defeated! Game over.")
-					return
-				}
-			}
+		default:
+			fmt.Println("Invalid choice. Please try again.")
+			continue
 		}
 	}
 }
 
-func (gw *GameWorld) Explore() {
-	fmt.Println("Exploring the area...")
-	rand.Seed(time.Now().UnixNano())
-	event := rand.Intn(3)
-	switch event {
-	case 0:
-		fmt.Println("You found a treasure chest!")
-		gw.Player.AddItem("Potion")
-	case 1:
-		fmt.Println("You encountered enemies!")
-		gw.GenerateEnemies()
-		gw.Battle()
-	case 2:
-		fmt.Println("It's quiet here. Nothing happened.")
+func (g *Game) UseItemMenu() {
+	if len(g.Player.Inventory) == 0 {
+		fmt.Println("Your inventory is empty.")
+		return
 	}
+	fmt.Println("Your Inventory:")
+	for i, item := range g.Player.Inventory {
+		fmt.Printf("%d. %s\n", i+1, item)
+	}
+	fmt.Print("Choose an item to use (0 to cancel): ")
+	var choice int
+	fmt.Scan(&choice)
+	if choice == 0 {
+		return
+	}
+	if choice < 1 || choice > len(g.Player.Inventory) {
+		fmt.Println("Invalid choice.")
+		return
+	}
+	g.Player.UseItem(choice - 1)
 }
 
-func (gw *GameWorld) SaveGame(filename string) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	writer := bufio.NewWriter(file)
-	fmt.Fprintf(writer, "%s\n", gw.Player.Name)
-	fmt.Fprintf(writer, "%d\n", gw.Player.Health)
-	fmt.Fprintf(writer, "%d\n", gw.Player.MaxHealth)
-	fmt.Fprintf(writer, "%d\n", gw.Player.Attack)
-	fmt.Fprintf(writer, "%d\n", gw.Player.Defense)
-	fmt.Fprintf(writer, "%d\n", gw.Player.Level)
-	fmt.Fprintf(writer, "%d\n", gw.Player.Experience)
-	fmt.Fprintf(writer, "%d\n", len(gw.Player.Inventory))
-	for _, item := range gw.Player.Inventory {
-		fmt.Fprintf(writer, "%s\n", item)
-	}
-	fmt.Fprintf(writer, "%d\n", gw.CurrentLocation)
-	writer.Flush()
-	fmt.Println("Game saved successfully.")
-	return nil
+func (g *Game) DisplayGameStatus() {
+	fmt.Printf("\n--- Game Status ---\n")
+	fmt.Printf("Round: %d\n", g.Round)
+	g.Player.DisplayStats()
 }
 
-func (gw *GameWorld) LoadGame(filename string) error {
-	file, err := os.Open(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	reader := bufio.NewReader(file)
-	name, _ := reader.ReadString('\n')
-	gw.Player.Name = strings.TrimSpace(name)
-	healthStr, _ := reader.ReadString('\n')
-	gw.Player.Health, _ = strconv.Atoi(strings.TrimSpace(healthStr))
-	maxHealthStr, _ := reader.ReadString('\n')
-	gw.Player.MaxHealth, _ = strconv.Atoi(strings.TrimSpace(maxHealthStr))
-	attackStr, _ := reader.ReadString('\n')
-	gw.Player.Attack, _ = strconv.Atoi(strings.TrimSpace(attackStr))
-	defenseStr, _ := reader.ReadString('\n')
-	gw.Player.Defense, _ = strconv.Atoi(strings.TrimSpace(defenseStr))
-	levelStr, _ := reader.ReadString('\n')
-	gw.Player.Level, _ = strconv.Atoi(strings.TrimSpace(levelStr))
-	expStr, _ := reader.ReadString('\n')
-	gw.Player.Experience, _ = strconv.Atoi(strings.TrimSpace(expStr))
-	invCountStr, _ := reader.ReadString('\n')
-	invCount, _ := strconv.Atoi(strings.TrimSpace(invCountStr))
-	gw.Player.Inventory = []string{}
-	for i := 0; i < invCount; i++ {
-		item, _ := reader.ReadString('\n')
-		gw.Player.Inventory = append(gw.Player.Inventory, strings.TrimSpace(item))
-	}
-	locationStr, _ := reader.ReadString('\n')
-	gw.CurrentLocation, _ = strconv.Atoi(strings.TrimSpace(locationStr))
-	fmt.Println("Game loaded successfully.")
-	return nil
-}
-
-func main() {
-	fmt.Println("Welcome to the Complex Game Simulator!")
-	gw := GameWorld{
-		Player: Character{
-			Name:      "Hero",
-			Health:    100,
-			MaxHealth: 100,
-			Attack:    10,
-			Defense:   5,
-			Level:     1,
-			Experience: 0,
-			Inventory: []string{"Sword", "Shield"},
-		},
-		Locations:        []string{"Forest", "Cave", "Mountain", "Castle"},
-		CurrentLocation: 0,
-	}
-	reader := bufio.NewReader(os.Stdin)
+func (g *Game) MainMenu() {
 	for {
 		fmt.Println("\n--- Main Menu ---")
-		fmt.Println("1. Display Player Status")
-		fmt.Println("2. Display Current Location")
-		fmt.Println("3. Move to Another Location")
-		fmt.Println("4. Explore Current Location")
-		fmt.Println("5. Battle Enemies")
-		fmt.Println("6. Use Item")
-		fmt.Println("7. Save Game")
-		fmt.Println("8. Load Game")
-		fmt.Println("9. Quit")
-		fmt.Print("Choose an option: ")
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(input)
-		switch input {
-		case "1":
-			gw.Player.DisplayStatus()
-		case "2":
-			gw.DisplayLocation()
-		case "3":
-			fmt.Println("Available locations:")
-			for i, loc := range gw.Locations {
-				fmt.Printf("%d: %s\n", i, loc)
+		fmt.Println("1. Start Battle")
+		fmt.Println("2. Check Stats")
+		fmt.Println("3. Use Item")
+		fmt.Println("4. Exit Game")
+		var choice int
+		fmt.Scan(&choice)
+		switch choice {
+		case 1:
+			g.StartBattle()
+			if !g.Player.IsAlive() {
+				return
 			}
-			fmt.Print("Enter location index to move to: ")
-			locInput, _ := reader.ReadString('\n')
-			locInput = strings.TrimSpace(locInput)
-			index, err := strconv.Atoi(locInput)
-			if err != nil {
-				fmt.Println("Invalid input.")
-			} else {
-				gw.MoveToLocation(index)
-			}
-		case "4":
-			gw.Explore()
-		case "5":
-			gw.Battle()
-		case "6":
-			fmt.Print("Enter item name to use: ")
-			itemInput, _ := reader.ReadString('\n')
-			itemInput = strings.TrimSpace(itemInput)
-			gw.Player.UseItem(itemInput)
-		case "7":
-			fmt.Print("Enter filename to save: ")
-			filename, _ := reader.ReadString('\n')
-			filename = strings.TrimSpace(filename)
-			gw.SaveGame(filename)
-		case "8":
-			fmt.Print("Enter filename to load: ")
-			filename, _ := reader.ReadString('\n')
-			filename = strings.TrimSpace(filename)
-			gw.LoadGame(filename)
-		case "9":
+		case 2:
+			g.DisplayGameStatus()
+		case 3:
+			g.UseItemMenu()
+		case 4:
 			fmt.Println("Thanks for playing!")
 			return
 		default:
-			fmt.Println("Invalid option. Please try again.")
+			fmt.Println("Invalid choice. Please try again.")
 		}
 	}
+}
+
+func main() {
+	rand.Seed(time.Now().UnixNano())
+	fmt.Println("Welcome to the Complex Game Simulator!")
+	fmt.Print("Enter your character's name: ")
+	var playerName string
+	fmt.Scan(&playerName)
+	game := NewGame(playerName)
+	game.MainMenu()
 }
