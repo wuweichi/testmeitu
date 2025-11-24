@@ -4,359 +4,300 @@ import (
 	"fmt"
 	"math/rand"
 	"time"
-	"strconv"
-	"strings"
 )
 
-type Character struct {
-	Name      string
-	Health    int
-	MaxHealth int
-	Attack    int
-	Defense   int
-	Level     int
-	Exp       int
-	Inventory []string
+type Player struct {
+	Name     string
+	Health   int
+	Strength int
+	Agility  int
+	Magic    int
 }
 
-type Enemy struct {
-	Name      string
-	Health    int
-	Attack    int
-	Defense   int
-	ExpReward int
+type Monster struct {
+	Name     string
+	Health   int
+	Strength int
+	Agility  int
+	Magic    int
+}
+
+type Item struct {
+	Name        string
+	Description string
+	Value       int
 }
 
 type GameState struct {
-	Player     Character
-	Enemies    []Enemy
-	GameOver   bool
-	Messages   []string
+	Player    Player
+	Monsters  []Monster
+	Inventory []Item
+	Level     int
+	Score     int
 }
 
-func (c *Character) LevelUp() {
-	c.Level++
-	c.MaxHealth += 10
-	c.Health = c.MaxHealth
-	c.Attack += 2
-	c.Defense += 1
-	c.Exp = 0
-}
-
-func (c *Character) GainExp(exp int) {
-	c.Exp += exp
-	if c.Exp >= c.Level*100 {
-		c.LevelUp()
-	}
-}
-
-func (c *Character) AttackEnemy(e *Enemy) int {
-	damage := c.Attack - e.Defense
-	if damage < 1 {
-		damage = 1
-	}
-	e.Health -= damage
-	if e.Health < 0 {
-		e.Health = 0
-	}
+func (p *Player) Attack(m *Monster) int {
+	damage := p.Strength + rand.Intn(10)
+	m.Health -= damage
 	return damage
 }
 
-func (e *Enemy) AttackPlayer(c *Character) int {
-	damage := e.Attack - c.Defense
-	if damage < 1 {
-		damage = 1
-	}
-	c.Health -= damage
-	if c.Health < 0 {
-		c.Health = 0
-	}
+func (m *Monster) Attack(p *Player) int {
+	damage := m.Strength + rand.Intn(8)
+	p.Health -= damage
 	return damage
 }
 
-func (gs *GameState) AddMessage(msg string) {
-	gs.Messages = append(gs.Messages, msg)
+func (p *Player) Heal() int {
+	healAmount := p.Magic + rand.Intn(15)
+	p.Health += healAmount
+	return healAmount
 }
 
-func (gs *GameState) PrintMessages() {
-	for _, msg := range gs.Messages {
-		fmt.Println(msg)
-	}
-	gs.Messages = []string{}
+func (p *Player) Dodge() bool {
+	return rand.Intn(100) < p.Agility
 }
 
-func (gs *GameState) GenerateEnemies() {
-	gs.Enemies = []Enemy{}
-	enemyTypes := []string{"Goblin", "Orc", "Dragon", "Skeleton", "Zombie"}
-	numEnemies := rand.Intn(3) + 1
-	for i := 0; i < numEnemies; i++ {
-		enemyType := enemyTypes[rand.Intn(len(enemyTypes))]
-		health := rand.Intn(20) + 10
-		attack := rand.Intn(5) + 5
-		defense := rand.Intn(3) + 2
-		expReward := rand.Intn(10) + 5
-		gs.Enemies = append(gs.Enemies, Enemy{
-			Name:      enemyType,
-			Health:    health,
-			Attack:    attack,
-			Defense:   defense,
-			ExpReward: expReward,
-		})
-	}
+func (m *Monster) Dodge() bool {
+	return rand.Intn(100) < m.Agility
 }
 
-func (gs *GameState) PlayerTurn() {
-	fmt.Println("\nYour turn!")
-	fmt.Println("Choose an action:")
-	fmt.Println("1. Attack")
-	fmt.Println("2. Use Item")
-	fmt.Println("3. Check Status")
-	fmt.Println("4. Flee")
-
-	var choice int
-	fmt.Scan(&choice)
-
-	switch choice {
-	case 1:
-		gs.AttackAction()
-	case 2:
-		gs.UseItemAction()
-	case 3:
-		gs.CheckStatusAction()
-	case 4:
-		gs.FleeAction()
-	default:
-		gs.AddMessage("Invalid choice!")
+func generateMonster(level int) Monster {
+	baseHealth := 50 + level*10
+	baseStrength := 10 + level*2
+	baseAgility := 5 + level
+	baseMagic := 3 + level
+	
+	names := []string{"Goblin", "Orc", "Troll", "Dragon", "Vampire", "Werewolf"}
+	
+	return Monster{
+		Name:     names[rand.Intn(len(names))],
+		Health:   baseHealth + rand.Intn(20),
+		Strength: baseStrength + rand.Intn(5),
+		Agility:  baseAgility + rand.Intn(3),
+		Magic:    baseMagic + rand.Intn(2),
 	}
 }
 
-func (gs *GameState) AttackAction() {
-	if len(gs.Enemies) == 0 {
-		gs.AddMessage("No enemies to attack!")
-		return
+func generateItem(level int) Item {
+	items := []Item{
+		{Name: "Health Potion", Description: "Restores health", Value: 20},
+		{Name: "Strength Potion", Description: "Increases strength", Value: 15},
+		{Name: "Agility Potion", Description: "Increases agility", Value: 15},
+		{Name: "Magic Potion", Description: "Increases magic", Value: 15},
+		{Name: "Sword", Description: "A sharp blade", Value: 30},
+		{Name: "Shield", Description: "Protects from attacks", Value: 25},
+		{Name: "Armor", Description: "Increases defense", Value: 40},
 	}
-
-	fmt.Println("Choose an enemy to attack:")
-	for i, enemy := range gs.Enemies {
-		fmt.Printf("%d. %s (Health: %d)\n", i+1, enemy.Name, enemy.Health)
-	}
-
-	var choice int
-	fmt.Scan(&choice)
-
-	if choice < 1 || choice > len(gs.Enemies) {
-		gs.AddMessage("Invalid enemy choice!")
-		return
-	}
-
-	enemyIndex := choice - 1
-	damage := gs.Player.AttackEnemy(&gs.Enemies[enemyIndex])
-	gs.AddMessage(fmt.Sprintf("You attack %s for %d damage!", gs.Enemies[enemyIndex].Name, damage))
-
-	if gs.Enemies[enemyIndex].Health == 0 {
-		gs.AddMessage(fmt.Sprintf("%s defeated! Gained %d exp.", gs.Enemies[enemyIndex].Name, gs.Enemies[enemyIndex].ExpReward))
-		gs.Player.GainExp(gs.Enemies[enemyIndex].ExpReward)
-		gs.Enemies = append(gs.Enemies[:enemyIndex], gs.Enemies[enemyIndex+1:]...)
-	}
+	
+	item := items[rand.Intn(len(items))]
+	item.Value += level * 5
+	return item
 }
 
-func (gs *GameState) UseItemAction() {
-	if len(gs.Player.Inventory) == 0 {
-		gs.AddMessage("No items in inventory!")
-		return
-	}
-
-	fmt.Println("Choose an item to use:")
-	for i, item := range gs.Player.Inventory {
-		fmt.Printf("%d. %s\n", i+1, item)
-	}
-
-	var choice int
-	fmt.Scan(&choice)
-
-	if choice < 1 || choice > len(gs.Player.Inventory) {
-		gs.AddMessage("Invalid item choice!")
-		return
-	}
-
-	itemIndex := choice - 1
-	item := gs.Player.Inventory[itemIndex]
-
-	switch item {
-	case "Health Potion":
-		gs.Player.Health += 20
-		if gs.Player.Health > gs.Player.MaxHealth {
-			gs.Player.Health = gs.Player.MaxHealth
-		}
-		gs.AddMessage("Used Health Potion! Restored 20 health.")
-	case "Attack Boost":
-		gs.Player.Attack += 5
-		gs.AddMessage("Used Attack Boost! Increased attack by 5.")
-	case "Defense Boost":
-		gs.Player.Defense += 3
-		gs.AddMessage("Used Defense Boost! Increased defense by 3.")
-	default:
-		gs.AddMessage("Item effect not implemented!")
-	}
-
-	gs.Player.Inventory = append(gs.Player.Inventory[:itemIndex], gs.Player.Inventory[itemIndex+1:]...)
-}
-
-func (gs *GameState) CheckStatusAction() {
-	gs.AddMessage(fmt.Sprintf("Name: %s", gs.Player.Name))
-	gs.AddMessage(fmt.Sprintf("Level: %d", gs.Player.Level))
-	gs.AddMessage(fmt.Sprintf("Health: %d/%d", gs.Player.Health, gs.Player.MaxHealth))
-	gs.AddMessage(fmt.Sprintf("Attack: %d", gs.Player.Attack))
-	gs.AddMessage(fmt.Sprintf("Defense: %d", gs.Player.Defense))
-	gs.AddMessage(fmt.Sprintf("Exp: %d/%d", gs.Player.Exp, gs.Player.Level*100))
-	gs.AddMessage(fmt.Sprintf("Inventory: %v", gs.Player.Inventory))
-}
-
-func (gs *GameState) FleeAction() {
-	if rand.Float32() < 0.5 {
-		gs.AddMessage("You successfully fled!")
-		gs.GameOver = true
-	} else {
-		gs.AddMessage("Failed to flee!")
-	}
-}
-
-func (gs *GameState) EnemyTurn() {
-	if len(gs.Enemies) == 0 {
-		return
-	}
-
-	for i := range gs.Enemies {
-		if gs.Enemies[i].Health > 0 {
-			damage := gs.Enemies[i].AttackPlayer(&gs.Player)
-			gs.AddMessage(fmt.Sprintf("%s attacks you for %d damage!", gs.Enemies[i].Name, damage))
-		}
-	}
-}
-
-func (gs *GameState) CheckGameOver() {
-	if gs.Player.Health <= 0 {
-		gs.AddMessage("You have been defeated! Game Over.")
-		gs.GameOver = true
-	} else if len(gs.Enemies) == 0 {
-		gs.AddMessage("All enemies defeated! You win!")
-		gs.GameOver = true
-	}
-}
-
-func (gs *GameState) Battle() {
-	gs.GenerateEnemies()
-	gs.AddMessage("A battle begins!")
-	gs.AddMessage(fmt.Sprintf("Enemies: %v", func() []string {
-		var names []string
-		for _, enemy := range gs.Enemies {
-			names = append(names, enemy.Name)
-		}
-		return names
-	}()))
-
-	for !gs.GameOver {
-		gs.PlayerTurn()
-		gs.CheckGameOver()
-		if gs.GameOver {
-			break
-		}
-		gs.EnemyTurn()
-		gs.CheckGameOver()
-		gs.PrintMessages()
-	}
-}
-
-func (gs *GameState) Explore() {
-	events := []string{
-		"You find a treasure chest!",
-		"You discover a hidden path.",
-		"You encounter a friendly traveler.",
-		"You stumble upon an ancient ruin.",
-		"You find a mysterious artifact.",
-	}
-
-	event := events[rand.Intn(len(events))]
-	gs.AddMessage(event)
-
-	switch event {
-	case "You find a treasure chest!":
-		items := []string{"Health Potion", "Attack Boost", "Defense Boost"}
-		item := items[rand.Intn(len(items))]
-		gs.Player.Inventory = append(gs.Player.Inventory, item)
-		gs.AddMessage(fmt.Sprintf("You found a %s!", item))
-	case "You discover a hidden path.":
-		gs.Player.GainExp(10)
-		gs.AddMessage("Gained 10 exp for exploration!")
-	case "You encounter a friendly traveler.":
-		gs.Player.Health = gs.Player.MaxHealth
-		gs.AddMessage("The traveler heals you to full health!")
-	case "You stumble upon an ancient ruin.":
-		gs.Player.Attack += 1
-		gs.AddMessage("You gain 1 attack from the ruin's knowledge!")
-	case "You find a mysterious artifact.":
-		gs.Player.Defense += 1
-		gs.AddMessage("You gain 1 defense from the artifact's power!")
-	}
-}
-
-func (gs *GameState) MainMenu() {
-	for {
-		fmt.Println("\nMain Menu:")
-		fmt.Println("1. Start Battle")
-		fmt.Println("2. Explore")
-		fmt.Println("3. Check Status")
-		fmt.Println("4. Quit")
-
+func battle(player *Player, monster *Monster) bool {
+	fmt.Printf("A wild %s appears!\n", monster.Name)
+	
+	for player.Health > 0 && monster.Health > 0 {
+		fmt.Printf("\nYour Health: %d | %s's Health: %d\n", player.Health, monster.Name, monster.Health)
+		fmt.Println("Choose your action:")
+		fmt.Println("1. Attack")
+		fmt.Println("2. Heal")
+		fmt.Println("3. Dodge")
+		
 		var choice int
 		fmt.Scan(&choice)
-
+		
 		switch choice {
 		case 1:
-			gs.Battle()
+			if !monster.Dodge() {
+				damage := player.Attack(monster)
+				fmt.Printf("You attack the %s for %d damage!\n", monster.Name, damage)
+			} else {
+				fmt.Printf("The %s dodged your attack!\n", monster.Name)
+			}
 		case 2:
-			gs.Explore()
-			gs.PrintMessages()
+			healAmount := player.Heal()
+			fmt.Printf("You heal yourself for %d health!\n", healAmount)
 		case 3:
-			gs.CheckStatusAction()
-			gs.PrintMessages()
-		case 4:
-			gs.AddMessage("Thanks for playing!")
-			gs.PrintMessages()
-			return
+			if player.Dodge() {
+				fmt.Println("You successfully dodge!")
+				continue
+			} else {
+				fmt.Println("Dodge failed!")
+			}
 		default:
-			gs.AddMessage("Invalid choice!")
-			gs.PrintMessages()
+			fmt.Println("Invalid choice!")
+			continue
 		}
-
-		if gs.GameOver {
-			gs.AddMessage("Game Over!")
-			gs.PrintMessages()
-			return
+		
+		if monster.Health <= 0 {
+			fmt.Printf("You defeated the %s!\n", monster.Name)
+			return true
+		}
+		
+		if !player.Dodge() {
+			damage := monster.Attack(player)
+			fmt.Printf("The %s attacks you for %d damage!\n", monster.Name, damage)
+		} else {
+			fmt.Printf("You dodged the %s's attack!\n", monster.Name)
+		}
+		
+		if player.Health <= 0 {
+			fmt.Println("You have been defeated!")
+			return false
 		}
 	}
+	
+	return player.Health > 0
+}
+
+func explore(player *Player, gameState *GameState) {
+	fmt.Println("You are exploring...")
+	
+	event := rand.Intn(3)
+	switch event {
+	case 0:
+		monster := generateMonster(gameState.Level)
+		if battle(player, &monster) {
+			gameState.Score += 100
+			item := generateItem(gameState.Level)
+			gameState.Inventory = append(gameState.Inventory, item)
+			fmt.Printf("You found a %s!\n", item.Name)
+		}
+	case 1:
+		item := generateItem(gameState.Level)
+		gameState.Inventory = append(gameState.Inventory, item)
+		fmt.Printf("You found a %s!\n", item.Name)
+	case 2:
+		fmt.Println("You found nothing interesting.")
+	}
+}
+
+func showInventory(gameState *GameState) {
+	fmt.Println("\n--- Inventory ---")
+	if len(gameState.Inventory) == 0 {
+		fmt.Println("Your inventory is empty.")
+	} else {
+		for i, item := range gameState.Inventory {
+			fmt.Printf("%d. %s - %s (Value: %d)\n", i+1, item.Name, item.Description, item.Value)
+		}
+	}
+}
+
+func useItem(player *Player, gameState *GameState) {
+	if len(gameState.Inventory) == 0 {
+		fmt.Println("Your inventory is empty!")
+		return
+	}
+	
+	showInventory(gameState)
+	fmt.Print("Enter the number of the item to use: ")
+	var choice int
+	fmt.Scan(&choice)
+	
+	if choice < 1 || choice > len(gameState.Inventory) {
+		fmt.Println("Invalid choice!")
+		return
+	}
+	
+	item := gameState.Inventory[choice-1]
+	switch item.Name {
+	case "Health Potion":
+		player.Health += item.Value
+		fmt.Printf("You used %s and restored %d health!\n", item.Name, item.Value)
+	case "Strength Potion":
+		player.Strength += 5
+		fmt.Printf("You used %s and increased your strength by 5!\n", item.Name)
+	case "Agility Potion":
+		player.Agility += 5
+		fmt.Printf("You used %s and increased your agility by 5!\n", item.Name)
+	case "Magic Potion":
+		player.Magic += 5
+		fmt.Printf("You used %s and increased your magic by 5!\n", item.Name)
+	default:
+		fmt.Printf("You can't use %s right now.\n", item.Name)
+		return
+	}
+	
+	gameState.Inventory = append(gameState.Inventory[:choice-1], gameState.Inventory[choice:]...)
+}
+
+func showStatus(player *Player, gameState *GameState) {
+	fmt.Println("\n--- Player Status ---")
+	fmt.Printf("Name: %s\n", player.Name)
+	fmt.Printf("Health: %d\n", player.Health)
+	fmt.Printf("Strength: %d\n", player.Strength)
+	fmt.Printf("Agility: %d\n", player.Agility)
+	fmt.Printf("Magic: %d\n", player.Magic)
+	fmt.Printf("Level: %d\n", gameState.Level)
+	fmt.Printf("Score: %d\n", gameState.Score)
 }
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
-
-	player := Character{
-		Name:      "Hero",
-		Health:    100,
-		MaxHealth: 100,
-		Attack:    10,
-		Defense:   5,
-		Level:     1,
-		Exp:       0,
-		Inventory: []string{"Health Potion", "Attack Boost"},
+	
+	fmt.Println("Welcome to the Complex Game Simulator!")
+	fmt.Print("Enter your character name: ")
+	
+	var playerName string
+	fmt.Scan(&playerName)
+	
+	player := Player{
+		Name:     playerName,
+		Health:   100,
+		Strength: 15,
+		Agility:  10,
+		Magic:    8,
 	}
-
+	
 	gameState := GameState{
 		Player:   player,
-		GameOver: false,
-		Messages: []string{},
+		Monsters: []Monster{},
+		Level:    1,
+		Score:    0,
 	}
-
-	fmt.Println("Welcome to the Complex Game Simulator!")
-	gameState.MainMenu()
+	
+	for {
+		fmt.Println("\n--- Main Menu ---")
+		fmt.Println("1. Explore")
+		fmt.Println("2. Show Inventory")
+		fmt.Println("3. Use Item")
+		fmt.Println("4. Show Status")
+		fmt.Println("5. Quit")
+		
+		var choice int
+		fmt.Scan(&choice)
+		
+		switch choice {
+		case 1:
+			explore(&player, &gameState)
+			if player.Health <= 0 {
+				fmt.Println("Game Over!")
+				fmt.Printf("Final Score: %d\n", gameState.Score)
+				return
+			}
+			
+			if gameState.Score >= gameState.Level*200 {
+				gameState.Level++
+				player.Health += 20
+				player.Strength += 2
+				player.Agility += 1
+				player.Magic += 1
+				fmt.Printf("\nCongratulations! You reached level %d!\n", gameState.Level)
+			}
+		case 2:
+			showInventory(&gameState)
+		case 3:
+			useItem(&player, &gameState)
+		case 4:
+			showStatus(&player, &gameState)
+		case 5:
+			fmt.Println("Thanks for playing!")
+			fmt.Printf("Final Score: %d\n", gameState.Score)
+			return
+		default:
+			fmt.Println("Invalid choice!")
+		}
+	}
 }
