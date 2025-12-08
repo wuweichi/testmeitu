@@ -1,373 +1,298 @@
 package main
 
 import (
-	"fmt"
-	"math/rand"
-	"os"
-	"os/exec"
-	"runtime"
-	"time"
-	"github.com/eiannone/keyboard"
+    "fmt"
+    "math/rand"
+    "os"
+    "os/exec"
+    "runtime"
+    "time"
+    "github.com/eiannone/keyboard"
+)
+
+const (
+    boardWidth  = 10
+    boardHeight = 20
+    cellEmpty   = 0
+    cellFilled  = 1
+    cellCurrent = 2
 )
 
 type Point struct {
-	X, Y int
+    X, Y int
 }
 
 type Tetromino struct {
-	Shape    [][]int
-	Rotation int
-	Color    int
-}
-
-type Game struct {
-	Board          [][]int
-	CurrentPiece   Tetromino
-	NextPiece      Tetromino
-	PiecePosition  Point
-	Score          int
-	Level          int
-	LinesCleared   int
-	GameOver       bool
-	Paused         bool
-}
-
-const (
-	BoardWidth  = 10
-	BoardHeight = 20
-	BlockSize   = 2
-)
-
-var colors = []string{
-	"\033[0m",   // Reset
-	"\033[31m", // Red
-	"\033[32m", // Green
-	"\033[33m", // Yellow
-	"\033[34m", // Blue
-	"\033[35m", // Magenta
-	"\033[36m", // Cyan
-	"\033[37m", // White
+    shape [][]int
+    color string
 }
 
 var tetrominoes = []Tetromino{
-	// I
-	{
-		Shape: [][]int{
-			{0, 0, 0, 0},
-			{1, 1, 1, 1},
-			{0, 0, 0, 0},
-			{0, 0, 0, 0},
-		},
-		Color: 1,
-	},
-	// J
-	{
-		Shape: [][]int{
-			{1, 0, 0},
-			{1, 1, 1},
-			{0, 0, 0},
-		},
-		Color: 2,
-	},
-	// L
-	{
-		Shape: [][]int{
-			{0, 0, 1},
-			{1, 1, 1},
-			{0, 0, 0},
-		},
-		Color: 3,
-	},
-	// O
-	{
-		Shape: [][]int{
-			{1, 1},
-			{1, 1},
-		},
-		Color: 4,
-	},
-	// S
-	{
-		Shape: [][]int{
-			{0, 1, 1},
-			{1, 1, 0},
-			{0, 0, 0},
-		},
-		Color: 5,
-	},
-	// T
-	{
-		Shape: [][]int{
-			{0, 1, 0},
-			{1, 1, 1},
-			{0, 0, 0},
-		},
-		Color: 6,
-	},
-	// Z
-	{
-		Shape: [][]int{
-			{1, 1, 0},
-			{0, 1, 1},
-			{0, 0, 0},
-		},
-		Color: 7,
-	},
+    {shape: [][]int{{1, 1, 1, 1}}, color: "\033[36m"},
+    {shape: [][]int{{1, 1}, {1, 1}}, color: "\033[33m"},
+    {shape: [][]int{{0, 1, 0}, {1, 1, 1}}, color: "\033[35m"},
+    {shape: [][]int{{1, 1, 0}, {0, 1, 1}}, color: "\033[32m"},
+    {shape: [][]int{{0, 1, 1}, {1, 1, 0}}, color: "\033[31m"},
+    {shape: [][]int{{1, 0, 0}, {1, 1, 1}}, color: "\033[34m"},
+    {shape: [][]int{{0, 0, 1}, {1, 1, 1}}, color: "\033[37m"},
 }
 
-func clearScreen() {
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("cmd", "/c", "cls")
-	} else {
-		cmd = exec.Command("clear")
-	}
-	cmd.Stdout = os.Stdout
-	cmd.Run()
+type Game struct {
+    board      [boardHeight][boardWidth]int
+    current    Tetromino
+    position   Point
+    score      int
+    level      int
+    lines      int
+    gameOver   bool
+    paused     bool
+    startTime  time.Time
+    lastDrop   time.Time
+    dropSpeed  time.Duration
 }
 
-func (g *Game) initBoard() {
-	g.Board = make([][]int, BoardHeight)
-	for i := range g.Board {
-		g.Board[i] = make([]int, BoardWidth)
-	}
+func (g *Game) init() {
+    rand.Seed(time.Now().UnixNano())
+    g.newPiece()
+    g.score = 0
+    g.level = 1
+    g.lines = 0
+    g.gameOver = false
+    g.paused = false
+    g.startTime = time.Now()
+    g.lastDrop = time.Now()
+    g.dropSpeed = 1000 * time.Millisecond
 }
 
 func (g *Game) newPiece() {
-	g.CurrentPiece = g.NextPiece
-	g.NextPiece = tetrominoes[rand.Intn(len(tetrominoes))]
-	g.PiecePosition = Point{X: BoardWidth/2 - len(g.CurrentPiece.Shape[0])/2, Y: 0}
-	if g.checkCollision() {
-		g.GameOver = true
-	}
-}
-
-func (g *Game) rotatePiece() {
-	oldRotation := g.CurrentPiece.Rotation
-	g.CurrentPiece.Rotation = (g.CurrentPiece.Rotation + 1) % 4
-	// Rotate the shape
-	rows := len(g.CurrentPiece.Shape)
-	cols := len(g.CurrentPiece.Shape[0])
-	rotated := make([][]int, cols)
-	for i := range rotated {
-		rotated[i] = make([]int, rows)
-	}
-	for i := 0; i < rows; i++ {
-		for j := 0; j < cols; j++ {
-			rotated[j][rows-1-i] = g.CurrentPiece.Shape[i][j]
-		}
-	}
-	g.CurrentPiece.Shape = rotated
-	if g.checkCollision() {
-		g.CurrentPiece.Rotation = oldRotation
-		// Revert rotation
-		g.CurrentPiece.Shape = make([][]int, rows)
-		for i := range g.CurrentPiece.Shape {
-			g.CurrentPiece.Shape[i] = make([]int, cols)
-			for j := range g.CurrentPiece.Shape[i] {
-				g.CurrentPiece.Shape[i][j] = rotated[cols-1-j][i]
-			}
-		}
-	}
-}
-
-func (g *Game) movePiece(dx, dy int) {
-	g.PiecePosition.X += dx
-	g.PiecePosition.Y += dy
-	if g.checkCollision() {
-		g.PiecePosition.X -= dx
-		g.PiecePosition.Y -= dy
-		if dy > 0 {
-			g.lockPiece()
-			g.clearLines()
-			g.newPiece()
-		}
-		return
-	}
+    g.current = tetrominoes[rand.Intn(len(tetrominoes))]
+    g.position = Point{X: boardWidth/2 - len(g.current.shape[0])/2, Y: 0}
+    if g.checkCollision() {
+        g.gameOver = true
+    }
 }
 
 func (g *Game) checkCollision() bool {
-	for y, row := range g.CurrentPiece.Shape {
-		for x, cell := range row {
-			if cell != 0 {
-				boardX := g.PiecePosition.X + x
-				boardY := g.PiecePosition.Y + y
-				if boardX < 0 || boardX >= BoardWidth || boardY >= BoardHeight || (boardY >= 0 && g.Board[boardY][boardX] != 0) {
-					return true
-				}
-			}
-		}
-	}
-	return false
+    for y, row := range g.current.shape {
+        for x, cell := range row {
+            if cell == 1 {
+                boardX := g.position.X + x
+                boardY := g.position.Y + y
+                if boardX < 0 || boardX >= boardWidth || boardY >= boardHeight || (boardY >= 0 && g.board[boardY][boardX] == cellFilled) {
+                    return true
+                }
+            }
+        }
+    }
+    return false
 }
 
-func (g *Game) lockPiece() {
-	for y, row := range g.CurrentPiece.Shape {
-		for x, cell := range row {
-			if cell != 0 {
-				boardY := g.PiecePosition.Y + y
-				if boardY >= 0 {
-					boardX := g.PiecePosition.X + x
-					g.Board[boardY][boardX] = g.CurrentPiece.Color
-				}
-			}
-		}
-	}
+func (g *Game) mergePiece() {
+    for y, row := range g.current.shape {
+        for x, cell := range row {
+            if cell == 1 {
+                boardX := g.position.X + x
+                boardY := g.position.Y + y
+                if boardY >= 0 {
+                    g.board[boardY][boardX] = cellFilled
+                }
+            }
+        }
+    }
 }
 
 func (g *Game) clearLines() {
-	linesCleared := 0
-	for y := BoardHeight - 1; y >= 0; y-- {
-		full := true
-		for x := 0; x < BoardWidth; x++ {
-			if g.Board[y][x] == 0 {
-				full = false
-				break
-			}
-		}
-		if full {
-			linesCleared++
-			// Remove the line
-			for ny := y; ny > 0; ny-- {
-				copy(g.Board[ny], g.Board[ny-1])
-			}
-			// Clear the top line
-			for x := 0; x < BoardWidth; x++ {
-				g.Board[0][x] = 0
-			}
-			y++ // Recheck the same line index after shifting
-		}
-	}
-	if linesCleared > 0 {
-		g.LinesCleared += linesCleared
-		g.Score += linesCleared * 100 * g.Level
-		g.Level = g.LinesCleared/10 + 1
-	}
+    linesCleared := 0
+    for y := boardHeight - 1; y >= 0; y-- {
+        full := true
+        for x := 0; x < boardWidth; x++ {
+            if g.board[y][x] == cellEmpty {
+                full = false
+                break
+            }
+        }
+        if full {
+            linesCleared++
+            for yy := y; yy > 0; yy-- {
+                for x := 0; x < boardWidth; x++ {
+                    g.board[yy][x] = g.board[yy-1][x]
+                }
+            }
+            for x := 0; x < boardWidth; x++ {
+                g.board[0][x] = cellEmpty
+            }
+            y++
+        }
+    }
+    if linesCleared > 0 {
+        g.lines += linesCleared
+        g.score += linesCleared * 100 * g.level
+        g.level = g.lines/10 + 1
+        g.dropSpeed = time.Duration(1000/g.level) * time.Millisecond
+        if g.dropSpeed < 100*time.Millisecond {
+            g.dropSpeed = 100 * time.Millisecond
+        }
+    }
+}
+
+func (g *Game) move(dx, dy int) bool {
+    g.position.X += dx
+    g.position.Y += dy
+    if g.checkCollision() {
+        g.position.X -= dx
+        g.position.Y -= dy
+        return false
+    }
+    return true
+}
+
+func (g *Game) rotate() {
+    oldShape := g.current.shape
+    rows := len(oldShape)
+    cols := len(oldShape[0])
+    newShape := make([][]int, cols)
+    for i := range newShape {
+        newShape[i] = make([]int, rows)
+    }
+    for y := 0; y < rows; y++ {
+        for x := 0; x < cols; x++ {
+            newShape[x][rows-1-y] = oldShape[y][x]
+        }
+    }
+    g.current.shape = newShape
+    if g.checkCollision() {
+        g.current.shape = oldShape
+    }
+}
+
+func (g *Game) drop() {
+    for g.move(0, 1) {
+    }
+    g.mergePiece()
+    g.clearLines()
+    g.newPiece()
+}
+
+func (g *Game) update() {
+    if g.gameOver || g.paused {
+        return
+    }
+    if time.Since(g.lastDrop) > g.dropSpeed {
+        if !g.move(0, 1) {
+            g.mergePiece()
+            g.clearLines()
+            g.newPiece()
+        }
+        g.lastDrop = time.Now()
+    }
 }
 
 func (g *Game) draw() {
-	clearScreen()
-	fmt.Println("Advanced Tetris Game")
-	fmt.Printf("Score: %d | Level: %d | Lines: %d\n", g.Score, g.Level, g.LinesCleared)
-	fmt.Println("Controls: Arrow Keys to move, Up to rotate, P to pause, Q to quit")
-	fmt.Println()
-
-	// Draw the board with current piece
-	for y := 0; y < BoardHeight; y++ {
-		fmt.Print("| ")
-		for x := 0; x < BoardWidth; x++ {
-			cell := g.Board[y][x]
-			// Check if current piece occupies this cell
-			if y >= g.PiecePosition.Y && y < g.PiecePosition.Y+len(g.CurrentPiece.Shape) &&
-				x >= g.PiecePosition.X && x < g.PiecePosition.X+len(g.CurrentPiece.Shape[0]) {
-				pieceY := y - g.PiecePosition.Y
-				pieceX := x - g.PiecePosition.X
-				if pieceY >= 0 && pieceY < len(g.CurrentPiece.Shape) &&
-					pieceX >= 0 && pieceX < len(g.CurrentPiece.Shape[0]) &&
-					g.CurrentPiece.Shape[pieceY][pieceX] != 0 {
-					cell = g.CurrentPiece.Color
-				}
-			}
-			if cell == 0 {
-				fmt.Print("  ")
-			} else {
-				fmt.Printf("%s██\033[0m", colors[cell])
-			}
-		}
-		fmt.Println(" |")
-	}
-	fmt.Print("+")
-	for x := 0; x < BoardWidth*2; x++ {
-		fmt.Print("-")
-	}
-	fmt.Println("+")
-
-	// Draw next piece preview
-	fmt.Println("\nNext Piece:")
-	for y := 0; y < len(g.NextPiece.Shape); y++ {
-		for x := 0; x < len(g.NextPiece.Shape[0]); x++ {
-			if g.NextPiece.Shape[y][x] != 0 {
-				fmt.Printf("%s██\033[0m", colors[g.NextPiece.Color])
-			} else {
-				fmt.Print("  ")
-			}
-		}
-		fmt.Println()
-	}
-
-	if g.Paused {
-		fmt.Println("\nGame Paused - Press P to resume")
-	}
-	if g.GameOver {
-		fmt.Println("\nGame Over!")
-		fmt.Printf("Final Score: %d\n", g.Score)
-	}
+    clearScreen()
+    fmt.Println("Advanced Tetris Game")
+    fmt.Printf("Score: %d | Level: %d | Lines: %d\n", g.score, g.level, g.lines)
+    fmt.Printf("Time: %s\n", time.Since(g.startTime).Round(time.Second))
+    fmt.Println("Controls: Arrow Keys (Move), Up (Rotate), Space (Drop), P (Pause), Q (Quit)")
+    fmt.Println()
+    for y := 0; y < boardHeight; y++ {
+        fmt.Print("| ")
+        for x := 0; x < boardWidth; x++ {
+            cell := g.board[y][x]
+            inCurrent := false
+            if !g.gameOver {
+                for cy, row := range g.current.shape {
+                    for cx, ccell := range row {
+                        if ccell == 1 && g.position.Y+cy == y && g.position.X+cx == x {
+                            inCurrent = true
+                            break
+                        }
+                    }
+                    if inCurrent {
+                        break
+                    }
+                }
+            }
+            if inCurrent {
+                fmt.Printf("%s█\033[0m ", g.current.color)
+            } else if cell == cellFilled {
+                fmt.Print("█ ")
+            } else {
+                fmt.Print(". ")
+            }
+        }
+        fmt.Println("|")
+    }
+    fmt.Println("+----------------------+")
+    if g.gameOver {
+        fmt.Println("GAME OVER!")
+        fmt.Println("Press Q to quit.")
+    } else if g.paused {
+        fmt.Println("PAUSED")
+    }
 }
 
-func (g *Game) run() {
-	err := keyboard.Open()
-	if err != nil {
-		fmt.Println("Error opening keyboard:", err)
-		return
-	}
-	defer keyboard.Close()
-
-	g.initBoard()
-	g.NextPiece = tetrominoes[rand.Intn(len(tetrominoes))]
-	g.newPiece()
-
-	ticker := time.NewTicker(time.Second / time.Duration(g.Level))
-	defer ticker.Stop()
-
-	for !g.GameOver {
-		select {
-		case <-ticker.C:
-			if !g.Paused {
-				g.movePiece(0, 1)
-			}
-		default:
-			if g.Paused {
-				g.draw()
-				time.Sleep(100 * time.Millisecond)
-				continue
-			}
-			char, key, err := keyboard.GetKey()
-			if err != nil {
-				continue
-			}
-			switch {
-			case key == keyboard.KeyArrowLeft:
-				g.movePiece(-1, 0)
-			case key == keyboard.KeyArrowRight:
-				g.movePiece(1, 0)
-			case key == keyboard.KeyArrowDown:
-				g.movePiece(0, 1)
-			case key == keyboard.KeyArrowUp:
-				g.rotatePiece()
-			case char == 'p' || char == 'P':
-				g.Paused = !g.Paused
-			case char == 'q' || char == 'Q':
-				return
-			}
-		}
-		g.draw()
-	}
-
-	// Game over loop
-	for {
-		g.draw()
-		char, key, err := keyboard.GetKey()
-		if err != nil {
-			continue
-		}
-		if char == 'q' || char == 'Q' || key == keyboard.KeyEsc {
-			break
-		}
-	}
+func clearScreen() {
+    var cmd *exec.Cmd
+    if runtime.GOOS == "windows" {
+        cmd = exec.Command("cmd", "/c", "cls")
+    } else {
+        cmd = exec.Command("clear")
+    }
+    cmd.Stdout = os.Stdout
+    cmd.Run()
 }
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
-	game := &Game{}
-	game.run()
+    if err := keyboard.Open(); err != nil {
+        fmt.Println("Error opening keyboard:", err)
+        return
+    }
+    defer keyboard.Close()
+    game := &Game{}
+    game.init()
+    ticker := time.NewTicker(50 * time.Millisecond)
+    defer ticker.Stop()
+    keyEvents := make(chan keyboard.Key)
+    go func() {
+        for {
+            _, key, err := keyboard.GetKey()
+            if err != nil {
+                close(keyEvents)
+                return
+            }
+            keyEvents <- key
+        }
+    }()
+    for {
+        select {
+        case <-ticker.C:
+            game.update()
+            game.draw()
+        case key := <-keyEvents:
+            if game.gameOver {
+                if key == keyboard.KeyEsc || key == keyboard.KeyCtrlC || key == keyboard.Key('q') || key == keyboard.Key('Q') {
+                    fmt.Println("Thanks for playing!")
+                    return
+                }
+                continue
+            }
+            switch key {
+            case keyboard.KeyArrowLeft:
+                game.move(-1, 0)
+            case keyboard.KeyArrowRight:
+                game.move(1, 0)
+            case keyboard.KeyArrowDown:
+                game.move(0, 1)
+            case keyboard.KeyArrowUp:
+                game.rotate()
+            case keyboard.KeySpace:
+                game.drop()
+            case keyboard.Key('p'), keyboard.Key('P'):
+                game.paused = !game.paused
+            case keyboard.KeyEsc, keyboard.KeyCtrlC, keyboard.Key('q'), keyboard.Key('Q'):
+                fmt.Println("Quitting game...")
+                return
+            }
+        }
+    }
 }
