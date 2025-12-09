@@ -1,418 +1,421 @@
 package main
 
 import (
-    "bufio"
-    "encoding/json"
-    "fmt"
-    "math/rand"
-    "os"
-    "strconv"
-    "strings"
-    "sync"
-    "time"
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"math/rand"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 )
 
-type GameCharacter struct {
-    Name      string
-    Health    int
-    MaxHealth int
-    Strength  int
-    Agility   int
-    Level     int
-    Experience int
-    Inventory []string
-}
-
-type GameWorld struct {
-    Name        string
-    Description string
-    Locations   []Location
-    NPCs        []NPC
-    Monsters    []Monster
-}
-
-type Location struct {
-    ID          int
-    Name        string
-    Description string
-    Exits       map[string]int
-    Items       []string
-}
-
-type NPC struct {
-    ID          int
-    Name        string
-    Dialogue    []string
-    Quest       *Quest
-}
-
-type Monster struct {
-    ID          int
-    Name        string
-    Health      int
-    Strength    int
-    Experience  int
-    Drops       []string
-}
-
-type Quest struct {
-    ID          int
-    Title       string
-    Description string
-    Objective   string
-    Reward      int
-    Completed   bool
-}
-
+// GameState represents the state of the simulation
 type GameState struct {
-    Character   GameCharacter
-    World       GameWorld
-    CurrentLocationID int
-    Quests      []Quest
-    GameTime    time.Time
-    mu          sync.Mutex
+	Players      []Player
+	GameObjects  []GameObject
+	Time         time.Time
+	Score        int
+	Level        int
+	IsRunning    bool
+	Mutex        sync.RWMutex
 }
 
-func NewGameCharacter(name string) GameCharacter {
-    return GameCharacter{
-        Name:      name,
-        Health:    100,
-        MaxHealth: 100,
-        Strength:  10,
-        Agility:   10,
-        Level:     1,
-        Experience: 0,
-        Inventory: []string{"Health Potion", "Sword"},
-    }
+// Player represents a player in the simulation
+type Player struct {
+	ID           int
+	Name         string
+	Health       int
+	Position     Position
+	Inventory    []Item
+	Skills       map[string]int
+	LastActive   time.Time
 }
 
-func NewGameWorld() GameWorld {
-    return GameWorld{
-        Name: "Fantasy Land",
-        Description: "A magical world full of adventure and danger.",
-        Locations: []Location{
-            {ID: 1, Name: "Starting Village", Description: "A peaceful village where your journey begins.", Exits: map[string]int{"north": 2, "east": 3}, Items: []string{"Map", "Torch"}},
-            {ID: 2, Name: "Dark Forest", Description: "A dense forest with mysterious creatures.", Exits: map[string]int{"south": 1, "east": 4}, Items: []string{"Herbs", "Mushrooms"}},
-            {ID: 3, Name: "Riverbank", Description: "A serene river with clear water.", Exits: map[string]int{"west": 1, "north": 4}, Items: []string{"Fishing Rod", "Water Flask"}},
-            {ID: 4, Name: "Ancient Ruins", Description: "Old ruins with hidden treasures.", Exits: map[string]int{"south": 2, "west": 3}, Items: []string{"Gold Coin", "Ancient Artifact"}},
-        },
-        NPCs: []NPC{
-            {ID: 1, Name: "Old Sage", Dialogue: []string{"Welcome, traveler!", "Beware of the monsters in the forest.", "I have a quest for you if you're interested."}, Quest: &Quest{ID: 1, Title: "Defeat the Goblin", Description: "A goblin is terrorizing the village.", Objective: "Kill the goblin in the Dark Forest.", Reward: 50, Completed: false}},
-            {ID: 2, Name: "Merchant", Dialogue: []string{"I sell potions and weapons.", "Check out my wares!"}, Quest: nil},
-        },
-        Monsters: []Monster{
-            {ID: 1, Name: "Goblin", Health: 30, Strength: 5, Experience: 20, Drops: []string{"Goblin Ear", "Copper Coin"}},
-            {ID: 2, Name: "Wolf", Health: 25, Strength: 8, Experience: 15, Drops: []string{"Wolf Pelt", "Meat"}},
-            {ID: 3, Name: "Troll", Health: 50, Strength: 12, Experience: 40, Drops: []string{"Troll Blood", "Gold Coin"}},
-        },
-    }
+// GameObject represents an object in the game world
+type GameObject struct {
+	ID         int
+	Type       string
+	Position   Position
+	Value      int
+	IsActive   bool
 }
 
-func (gs *GameState) SaveGame(filename string) error {
-    gs.mu.Lock()
-    defer gs.mu.Unlock()
-    file, err := os.Create(filename)
-    if err != nil {
-        return err
-    }
-    defer file.Close()
-    encoder := json.NewEncoder(file)
-    encoder.SetIndent("", "  ")
-    return encoder.Encode(gs)
+// Position represents a 2D position
+type Position struct {
+	X int
+	Y int
 }
 
-func (gs *GameState) LoadGame(filename string) error {
-    gs.mu.Lock()
-    defer gs.mu.Unlock()
-    file, err := os.Open(filename)
-    if err != nil {
-        return err
-    }
-    defer file.Close()
-    decoder := json.NewDecoder(file)
-    return decoder.Decode(gs)
+// Item represents an item that can be in inventory
+type Item struct {
+	ID    int
+	Name  string
+	Type  string
+	Value int
 }
 
-func (c *GameCharacter) Attack(target *Monster) (int, bool) {
-    damage := c.Strength + rand.Intn(5)
-    target.Health -= damage
-    if target.Health <= 0 {
-        c.Experience += target.Experience
-        return damage, true
-    }
-    return damage, false
+// Simulation constants
+const (
+	MaxPlayers     = 100
+	MaxObjects     = 500
+	WorldWidth     = 1000
+	WorldHeight    = 1000
+	TickDuration   = 100 * time.Millisecond
+	SaveInterval   = 30 * time.Second
+	LogFile        = "simulation.log"
+)
+
+var (
+	gameState GameState
+	logger    *os.File
+)
+
+func initGame() {
+	gameState = GameState{
+		Players:     make([]Player, 0, MaxPlayers),
+		GameObjects: make([]GameObject, 0, MaxObjects),
+		Time:        time.Now(),
+		Score:       0,
+		Level:       1,
+		IsRunning:   true,
+	}
+
+	// Initialize players
+	for i := 0; i < 50; i++ {
+		player := Player{
+			ID:         i,
+			Name:       fmt.Sprintf("Player%d", i),
+			Health:     100,
+			Position:   Position{X: rand.Intn(WorldWidth), Y: rand.Intn(WorldHeight)},
+			Inventory:  make([]Item, 0),
+			Skills:     make(map[string]int),
+			LastActive: time.Now(),
+		}
+		player.Skills["combat"] = rand.Intn(100)
+		player.Skills["magic"] = rand.Intn(100)
+		player.Skills["stealth"] = rand.Intn(100)
+		gameState.Players = append(gameState.Players, player)
+	}
+
+	// Initialize game objects
+	objectTypes := []string{"treasure", "enemy", "npc", "resource", "obstacle"}
+	for i := 0; i < 300; i++ {
+		objType := objectTypes[rand.Intn(len(objectTypes))]
+		gameObject := GameObject{
+			ID:       i,
+			Type:     objType,
+			Position: Position{X: rand.Intn(WorldWidth), Y: rand.Intn(WorldHeight)},
+			Value:    rand.Intn(1000),
+			IsActive: true,
+		}
+		gameState.GameObjects = append(gameState.GameObjects, gameObject)
+	}
+
+	// Initialize logger
+	var err error
+	logger, err = os.OpenFile(LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Printf("Failed to open log file: %v\n", err)
+	}
 }
 
-func (c *GameCharacter) TakeDamage(damage int) {
-    c.Health -= damage
-    if c.Health < 0 {
-        c.Health = 0
-    }
+func gameLoop() {
+	ticker := time.NewTicker(TickDuration)
+	saveTicker := time.NewTicker(SaveInterval)
+	defer ticker.Stop()
+	defer saveTicker.Stop()
+
+	for gameState.IsRunning {
+		select {
+		case <-ticker.C:
+			updateGameState()
+		case <-saveTicker.C:
+			saveGameState()
+		}
+	}
 }
 
-func (c *GameCharacter) LevelUp() {
-    for c.Experience >= c.Level*100 {
-        c.Experience -= c.Level * 100
-        c.Level++
-        c.MaxHealth += 20
-        c.Health = c.MaxHealth
-        c.Strength += 5
-        c.Agility += 3
-        fmt.Printf("Level up! You are now level %d.\n", c.Level)
-    }
+func updateGameState() {
+	gameState.Mutex.Lock()
+	defer gameState.Mutex.Unlock()
+
+	gameState.Time = time.Now()
+	gameState.Score += len(gameState.Players)
+
+	// Update players
+	for i := range gameState.Players {
+		// Move players randomly
+		gameState.Players[i].Position.X += rand.Intn(3) - 1
+		gameState.Players[i].Position.Y += rand.Intn(3) - 1
+
+		// Keep within bounds
+		if gameState.Players[i].Position.X < 0 {
+			gameState.Players[i].Position.X = 0
+		}
+		if gameState.Players[i].Position.X >= WorldWidth {
+			gameState.Players[i].Position.X = WorldWidth - 1
+		}
+		if gameState.Players[i].Position.Y < 0 {
+			gameState.Players[i].Position.Y = 0
+		}
+		if gameState.Players[i].Position.Y >= WorldHeight {
+			gameState.Players[i].Position.Y = WorldHeight - 1
+		}
+
+		// Update last active time
+		gameState.Players[i].LastActive = gameState.Time
+
+		// Random health changes
+		if rand.Intn(100) < 5 {
+			gameState.Players[i].Health += rand.Intn(20) - 10
+			if gameState.Players[i].Health > 100 {
+				gameState.Players[i].Health = 100
+			}
+			if gameState.Players[i].Health < 0 {
+				gameState.Players[i].Health = 0
+			}
+		}
+
+		// Skill improvements
+		for skill := range gameState.Players[i].Skills {
+			if rand.Intn(100) < 2 {
+				gameState.Players[i].Skills[skill] += 1
+				if gameState.Players[i].Skills[skill] > 100 {
+					gameState.Players[i].Skills[skill] = 100
+				}
+			}
+		}
+	}
+
+	// Update game objects
+	for i := range gameState.GameObjects {
+		// Randomly deactivate/reactivate objects
+		if rand.Intn(1000) < 2 {
+			gameState.GameObjects[i].IsActive = !gameState.GameObjects[i].IsActive
+		}
+
+		// Move some objects
+		if gameState.GameObjects[i].Type == "enemy" && rand.Intn(100) < 10 {
+			gameState.GameObjects[i].Position.X += rand.Intn(5) - 2
+			gameState.GameObjects[i].Position.Y += rand.Intn(5) - 2
+		}
+	}
+
+	// Check for level up
+	if gameState.Score > gameState.Level*1000 {
+		gameState.Level++
+		logEvent(fmt.Sprintf("Level up to %d!", gameState.Level))
+	}
+
+	// Random events
+	if rand.Intn(1000) < 2 {
+		spawnNewObject()
+	}
+	if rand.Intn(1000) < 1 {
+		spawnNewPlayer()
+	}
 }
 
-func (c *GameCharacter) UseItem(item string) bool {
-    for i, invItem := range c.Inventory {
-        if invItem == item {
-            if item == "Health Potion" {
-                c.Health += 30
-                if c.Health > c.MaxHealth {
-                    c.Health = c.MaxHealth
-                }
-                fmt.Println("Used Health Potion. Health restored.")
-            }
-            c.Inventory = append(c.Inventory[:i], c.Inventory[i+1:]...)
-            return true
-        }
-    }
-    return false
+func spawnNewObject() {
+	objectTypes := []string{"treasure", "enemy", "npc", "resource", "obstacle"}
+	objType := objectTypes[rand.Intn(len(objectTypes))]
+	newObj := GameObject{
+		ID:       len(gameState.GameObjects),
+		Type:     objType,
+		Position: Position{X: rand.Intn(WorldWidth), Y: rand.Intn(WorldHeight)},
+		Value:    rand.Intn(1000),
+		IsActive: true,
+	}
+	gameState.GameObjects = append(gameState.GameObjects, newObj)
+	logEvent(fmt.Sprintf("Spawned new %s at (%d, %d)", objType, newObj.Position.X, newObj.Position.Y))
 }
 
-func (gs *GameState) Move(direction string) bool {
-    currentLoc := gs.GetCurrentLocation()
-    if nextID, ok := currentLoc.Exits[direction]; ok {
-        gs.CurrentLocationID = nextID
-        fmt.Printf("Moved %s to %s.\n", direction, gs.GetCurrentLocation().Name)
-        return true
-    }
-    fmt.Println("You cannot go that way.")
-    return false
+func spawnNewPlayer() {
+	if len(gameState.Players) >= MaxPlayers {
+		return
+	}
+
+	newPlayer := Player{
+		ID:         len(gameState.Players),
+		Name:       fmt.Sprintf("Player%d", len(gameState.Players)),
+		Health:     100,
+		Position:   Position{X: rand.Intn(WorldWidth), Y: rand.Intn(WorldHeight)},
+		Inventory:  make([]Item, 0),
+		Skills:     make(map[string]int),
+		LastActive: time.Now(),
+	}
+	newPlayer.Skills["combat"] = rand.Intn(100)
+	newPlayer.Skills["magic"] = rand.Intn(100)
+	newPlayer.Skills["stealth"] = rand.Intn(100)
+	gameState.Players = append(gameState.Players, newPlayer)
+	logEvent(fmt.Sprintf("New player %s joined the game", newPlayer.Name))
 }
 
-func (gs *GameState) GetCurrentLocation() *Location {
-    for i := range gs.World.Locations {
-        if gs.World.Locations[i].ID == gs.CurrentLocationID {
-            return &gs.World.Locations[i]
-        }
-    }
-    return nil
+func saveGameState() {
+	gameState.Mutex.RLock()
+	defer gameState.Mutex.RUnlock()
+
+	data, err := json.MarshalIndent(gameState, "", "  ")
+	if err != nil {
+		logEvent(fmt.Sprintf("Failed to marshal game state: %v", err))
+		return
+	}
+
+	filename := fmt.Sprintf("save_%s.json", time.Now().Format("20060102_150405"))
+	err = os.WriteFile(filename, data, 0644)
+	if err != nil {
+		logEvent(fmt.Sprintf("Failed to save game state: %v", err))
+	} else {
+		logEvent(fmt.Sprintf("Game state saved to %s", filename))
+	}
 }
 
-func (gs *GameState) Look() {
-    loc := gs.GetCurrentLocation()
-    if loc == nil {
-        fmt.Println("Location not found.")
-        return
-    }
-    fmt.Printf("You are at: %s\n", loc.Name)
-    fmt.Printf("Description: %s\n", loc.Description)
-    fmt.Print("Exits: ")
-    for dir := range loc.Exits {
-        fmt.Printf("%s ", dir)
-    }
-    fmt.Println()
-    if len(loc.Items) > 0 {
-        fmt.Printf("Items here: %v\n", loc.Items)
-    }
-    for _, npc := range gs.World.NPCs {
-        fmt.Printf("NPC: %s\n", npc.Name)
-    }
+func logEvent(message string) {
+	if logger != nil {
+		logEntry := fmt.Sprintf("[%s] %s\n", time.Now().Format("2006-01-02 15:04:05"), message)
+		logger.WriteString(logEntry)
+	}
+	fmt.Println(message)
 }
 
-func (gs *GameState) TalkToNPC(name string) {
-    for i := range gs.World.NPCs {
-        if gs.World.NPCs[i].Name == name {
-            npc := &gs.World.NPCs[i]
-            fmt.Printf("%s says:\n", npc.Name)
-            for _, line := range npc.Dialogue {
-                fmt.Printf("  - %s\n", line)
-            }
-            if npc.Quest != nil && !npc.Quest.Completed {
-                fmt.Printf("Quest available: %s - %s\n", npc.Quest.Title, npc.Quest.Description)
-                fmt.Print("Accept quest? (yes/no): ")
-                reader := bufio.NewReader(os.Stdin)
-                input, _ := reader.ReadString('\n')
-                input = strings.TrimSpace(input)
-                if input == "yes" {
-                    gs.Quests = append(gs.Quests, *npc.Quest)
-                    fmt.Println("Quest accepted!")
-                }
-            }
-            return
-        }
-    }
-    fmt.Println("NPC not found.")
+func displayStatus() {
+	gameState.Mutex.RLock()
+	defer gameState.Mutex.RUnlock()
+
+	fmt.Println("\n=== Game Status ===")
+	fmt.Printf("Time: %s\n", gameState.Time.Format("2006-01-02 15:04:05"))
+	fmt.Printf("Level: %d\n", gameState.Level)
+	fmt.Printf("Score: %d\n", gameState.Score)
+	fmt.Printf("Active Players: %d\n", len(gameState.Players))
+	fmt.Printf("Active Objects: %d\n", countActiveObjects())
+
+	// Show top 5 players by skill
+	fmt.Println("\nTop 5 Players:")
+	players := make([]Player, len(gameState.Players))
+	copy(players, gameState.Players)
+
+	// Sort by total skill points
+	for i := 0; i < len(players)-1 && i < 4; i++ {
+		for j := i + 1; j < len(players); j++ {
+			if totalSkills(players[j]) > totalSkills(players[i]) {
+				players[i], players[j] = players[j], players[i]
+			}
+		}
+	}
+
+	for i := 0; i < 5 && i < len(players); i++ {
+		fmt.Printf("%d. %s (Health: %d, Skills: %d)\n", 
+			i+1, players[i].Name, players[i].Health, totalSkills(players[i]))
+	}
 }
 
-func (gs *GameState) Fight(monsterName string) {
-    var target *Monster
-    for i := range gs.World.Monsters {
-        if gs.World.Monsters[i].Name == monsterName {
-            target = &gs.World.Monsters[i]
-            break
-        }
-    }
-    if target == nil {
-        fmt.Println("Monster not found.")
-        return
-    }
-    fmt.Printf("You engage in combat with %s!\n", target.Name)
-    for gs.Character.Health > 0 && target.Health > 0 {
-        damage, killed := gs.Character.Attack(target)
-        fmt.Printf("You hit %s for %d damage.\n", target.Name, damage)
-        if killed {
-            fmt.Printf("%s defeated! You gain %d experience.\n", target.Name, target.Experience)
-            gs.Character.LevelUp()
-            for _, drop := range target.Drops {
-                gs.Character.Inventory = append(gs.Character.Inventory, drop)
-                fmt.Printf("You found: %s\n", drop)
-            }
-            for i := range gs.Quests {
-                if gs.Quests[i].Objective == fmt.Sprintf("Kill the %s", target.Name) {
-                    gs.Quests[i].Completed = true
-                    gs.Character.Experience += gs.Quests[i].Reward
-                    fmt.Printf("Quest completed! Reward: %d experience.\n", gs.Quests[i].Reward)
-                }
-            }
-            target.Health = 0
-            break
-        }
-        monsterDamage := target.Strength + rand.Intn(3)
-        gs.Character.TakeDamage(monsterDamage)
-        fmt.Printf("%s hits you for %d damage. Your health: %d/%d\n", target.Name, monsterDamage, gs.Character.Health, gs.Character.MaxHealth)
-        time.Sleep(500 * time.Millisecond)
-    }
-    if gs.Character.Health <= 0 {
-        fmt.Println("You have been defeated! Game over.")
-        os.Exit(0)
-    }
+func totalSkills(player Player) int {
+	total := 0
+	for _, skill := range player.Skills {
+		total += skill
+	}
+	return total
 }
 
-func (gs *GameState) ShowInventory() {
-    fmt.Printf("Inventory: %v\n", gs.Character.Inventory)
-    fmt.Printf("Health: %d/%d, Level: %d, Experience: %d\n", gs.Character.Health, gs.Character.MaxHealth, gs.Character.Level, gs.Character.Experience)
+func countActiveObjects() int {
+	count := 0
+	for _, obj := range gameState.GameObjects {
+		if obj.IsActive {
+			count++
+		}
+	}
+	return count
 }
 
-func (gs *GameState) ShowQuests() {
-    if len(gs.Quests) == 0 {
-        fmt.Println("No active quests.")
-        return
-    }
-    fmt.Println("Active Quests:")
-    for _, quest := range gs.Quests {
-        status := "In Progress"
-        if quest.Completed {
-            status = "Completed"
-        }
-        fmt.Printf("  - %s: %s [%s]\n", quest.Title, quest.Objective, status)
-    }
+func handleCommands() {
+	scanner := bufio.NewScanner(os.Stdin)
+	fmt.Println("\nGame Commands:")
+	fmt.Println("  status - Display game status")
+	fmt.Println("  save - Manually save game state")
+	fmt.Println("  players - List all players")
+	fmt.Println("  objects - List all game objects")
+	fmt.Println("  quit - Exit the game")
+	fmt.Println("\nEnter commands (one per line):")
+
+	for scanner.Scan() {
+		command := strings.TrimSpace(scanner.Text())
+		switch command {
+		case "status":
+			displayStatus()
+		case "save":
+			saveGameState()
+		case "players":
+			listPlayers()
+		case "objects":
+			listObjects()
+		case "quit":
+			gameState.IsRunning = false
+			fmt.Println("Shutting down game...")
+			return
+		case "":
+			// Do nothing for empty input
+		default:
+			fmt.Printf("Unknown command: %s\n", command)
+		}
+	}
+}
+
+func listPlayers() {
+	gameState.Mutex.RLock()
+	defer gameState.Mutex.RUnlock()
+
+	fmt.Println("\n=== All Players ===")
+	for _, player := range gameState.Players {
+		fmt.Printf("ID: %d, Name: %s, Health: %d, Position: (%d, %d), Last Active: %s\n",
+			player.ID, player.Name, player.Health, player.Position.X, player.Position.Y,
+			player.LastActive.Format("15:04:05"))
+	}
+}
+
+func listObjects() {
+	gameState.Mutex.RLock()
+	defer gameState.Mutex.RUnlock()
+
+	fmt.Println("\n=== All Game Objects ===")
+	for _, obj := range gameState.GameObjects {
+		status := "inactive"
+		if obj.IsActive {
+			status = "active"
+		}
+		fmt.Printf("ID: %d, Type: %s, Position: (%d, %d), Value: %d, Status: %s\n",
+			obj.ID, obj.Type, obj.Position.X, obj.Position.Y, obj.Value, status)
+	}
+}
+
+func cleanup() {
+	if logger != nil {
+		logger.Close()
+	}
+	fmt.Println("Game cleanup completed.")
 }
 
 func main() {
-    rand.Seed(time.Now().UnixNano())
-    fmt.Println("Welcome to Advanced Go Simulator!")
-    fmt.Print("Enter your character name: ")
-    reader := bufio.NewReader(os.Stdin)
-    name, _ := reader.ReadString('\n')
-    name = strings.TrimSpace(name)
-    if name == "" {
-        name = "Hero"
-    }
-    character := NewGameCharacter(name)
-    world := NewGameWorld()
-    gameState := GameState{
-        Character: character,
-        World:     world,
-        CurrentLocationID: 1,
-        Quests:    []Quest{},
-        GameTime:  time.Now(),
-    }
-    fmt.Printf("Hello, %s! Your adventure begins in %s.\n", character.Name, world.Name)
-    gameState.Look()
-    for {
-        fmt.Print("> ")
-        input, _ := reader.ReadString('\n')
-        input = strings.TrimSpace(input)
-        parts := strings.Fields(input)
-        if len(parts) == 0 {
-            continue
-        }
-        command := parts[0]
-        switch command {
-        case "look":
-            gameState.Look()
-        case "go":
-            if len(parts) < 2 {
-                fmt.Println("Usage: go <direction>")
-            } else {
-                gameState.Move(parts[1])
-            }
-        case "talk":
-            if len(parts) < 2 {
-                fmt.Println("Usage: talk <npc_name>")
-            } else {
-                gameState.TalkToNPC(parts[1])
-            }
-        case "fight":
-            if len(parts) < 2 {
-                fmt.Println("Usage: fight <monster_name>")
-            } else {
-                gameState.Fight(parts[1])
-            }
-        case "inventory", "inv":
-            gameState.ShowInventory()
-        case "use":
-            if len(parts) < 2 {
-                fmt.Println("Usage: use <item>")
-            } else {
-                if !gameState.Character.UseItem(parts[1]) {
-                    fmt.Println("Item not found in inventory.")
-                }
-            }
-        case "quests":
-            gameState.ShowQuests()
-        case "save":
-            if len(parts) < 2 {
-                fmt.Println("Usage: save <filename>")
-            } else {
-                err := gameState.SaveGame(parts[1])
-                if err != nil {
-                    fmt.Printf("Error saving game: %v\n", err)
-                } else {
-                    fmt.Println("Game saved successfully.")
-                }
-            }
-        case "load":
-            if len(parts) < 2 {
-                fmt.Println("Usage: load <filename>")
-            } else {
-                err := gameState.LoadGame(parts[1])
-                if err != nil {
-                    fmt.Printf("Error loading game: %v\n", err)
-                } else {
-                    fmt.Println("Game loaded successfully.")
-                    gameState.Look()
-                }
-            }
-        case "help":
-            fmt.Println("Available commands:")
-            fmt.Println("  look - Look around the current location")
-            fmt.Println("  go <direction> - Move in a direction (e.g., north, south)")
-            fmt.Println("  talk <npc_name> - Talk to an NPC")
-            fmt.Println("  fight <monster_name> - Fight a monster")
-            fmt.Println("  inventory/inv - Show inventory and stats")
-            fmt.Println("  use <item> - Use an item from inventory")
-            fmt.Println("  quests - Show active quests")
-            fmt.Println("  save <filename> - Save game to file")
-            fmt.Println("  load <filename> - Load game from file")
-            fmt.Println("  help - Show this help message")
-            fmt.Println("  quit - Exit the game")
-        case "quit":
-            fmt.Println("Thanks for playing! Goodbye.")
-            return
-        default:
-            fmt.Println("Unknown command. Type 'help' for a list of commands.")
-        }
-    }
+	fmt.Println("Starting Advanced Go Simulator...")
+	fmt.Println("This is a complex simulation with multiple systems running concurrently.")
+	fmt.Println("The game will run until you enter 'quit' command.")
+
+	// Seed random number generator
+	rand.Seed(time.Now().UnixNano())
+
+	// Initialize game
+	initGame()
+	logEvent("Game initialized")
+
+	// Start game loop in background
+	go gameLoop()
+
+	// Handle commands in main goroutine
+	handleCommands()
+
+	// Cleanup
+	cleanup()
+	fmt.Println("Game ended. Goodbye!")
 }
