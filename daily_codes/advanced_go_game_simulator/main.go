@@ -1,360 +1,386 @@
 package main
 
 import (
-    "bufio"
-    "encoding/json"
-    "fmt"
-    "math/rand"
-    "os"
-    "strconv"
-    "strings"
-    "sync"
-    "time"
+	"encoding/json"
+	"fmt"
+	"math/rand"
+	"os"
+	"strconv"
+	"strings"
+	"time"
 )
 
+// Game constants
+const (
+	MaxPlayers = 10
+	MaxRounds = 100
+	BoardSize = 20
+)
+
+// Player represents a game participant
 type Player struct {
-    ID        int
-    Name      string
-    Health    int
-    MaxHealth int
-    Attack    int
-    Defense   int
-    Level     int
-    Experience int
-    Inventory []string
-    Gold      int
-    Position  Point
+	ID          int
+	Name        string
+	Score       int
+	Position    int
+	IsActive    bool
+	SpecialPowers []string
 }
 
-type Point struct {
-    X int
-    Y int
+// GameState holds the current state of the game
+type GameState struct {
+	Round      int
+	Players    []Player
+	Board      []string
+	GameLog    []string
+	IsGameOver bool
 }
 
-type Monster struct {
-    ID      int
-    Name    string
-    Health  int
-    Attack  int
-    Defense int
-    Reward  Reward
+// GameEvent represents an event that occurs during gameplay
+type GameEvent struct {
+	Type        string
+	Description string
+	PlayerID    int
+	Round       int
 }
 
-type Reward struct {
-    Experience int
-    Gold       int
-    Items      []string
+// GameManager handles the game logic
+type GameManager struct {
+	State      GameState
+	Events     []GameEvent
+	RandSource *rand.Rand
 }
 
-type GameWorld struct {
-    Width    int
-    Height   int
-    Players  []Player
-    Monsters []Monster
-    Map      [][]string
-    mu       sync.Mutex
+// InitializeGame sets up a new game
+func (gm *GameManager) InitializeGame(playerNames []string) {
+	gm.RandSource = rand.New(rand.NewSource(time.Now().UnixNano()))
+	gm.State.Round = 1
+	gm.State.Board = make([]string, BoardSize)
+	for i := range gm.State.Board {
+		gm.State.Board[i] = "_"
+	}
+	gm.State.Players = make([]Player, len(playerNames))
+	for i, name := range playerNames {
+		gm.State.Players[i] = Player{
+			ID:          i + 1,
+			Name:        name,
+			Score:       0,
+			Position:    gm.RandSource.Intn(BoardSize),
+			IsActive:    true,
+			SpecialPowers: []string{"Double Points", "Teleport", "Shield"},
+		}
+	}
+	gm.logEvent("Game Initialized", "Game started with "+strconv.Itoa(len(playerNames))+" players")
 }
 
-func NewGameWorld(width, height int) *GameWorld {
-    gw := &GameWorld{
-        Width:   width,
-        Height:  height,
-        Players: []Player{},
-        Map:     make([][]string, height),
-    }
-    for i := range gw.Map {
-        gw.Map[i] = make([]string, width)
-        for j := range gw.Map[i] {
-            gw.Map[i][j] = "."
-        }
-    }
-    return gw
+// PlayRound simulates one round of the game
+func (gm *GameManager) PlayRound() {
+	if gm.State.IsGameOver || gm.State.Round > MaxRounds {
+		gm.State.IsGameOver = true
+		return
+	}
+
+	gm.logEvent("Round Start", "Round "+strconv.Itoa(gm.State.Round)+" begins")
+
+	// Process each active player
+	for i := range gm.State.Players {
+		if !gm.State.Players[i].IsActive {
+			continue
+		}
+
+		// Move player
+		oldPos := gm.State.Players[i].Position
+		move := gm.RandSource.Intn(6) + 1 // Dice roll 1-6
+		gm.State.Players[i].Position = (oldPos + move) % BoardSize
+
+		// Check for special events
+		if gm.RandSource.Float32() < 0.2 {
+			gm.triggerSpecialEvent(&gm.State.Players[i])
+		}
+
+		// Update board
+		gm.updateBoard()
+
+		// Score points
+		points := gm.calculatePoints(&gm.State.Players[i])
+		gm.State.Players[i].Score += points
+
+		gm.logEvent("Player Move", fmt.Sprintf("%s moved from %d to %d, scored %d points",
+			gm.State.Players[i].Name, oldPos, gm.State.Players[i].Position, points))
+	}
+
+	// Check for eliminations
+	gm.checkEliminations()
+
+	gm.State.Round++
+	if gm.State.Round > MaxRounds || len(gm.getActivePlayers()) <= 1 {
+		gm.State.IsGameOver = true
+		gm.logEvent("Game Over", "Game ended after "+strconv.Itoa(gm.State.Round-1)+" rounds")
+	}
 }
 
-func (gw *GameWorld) AddPlayer(p Player) {
-    gw.mu.Lock()
-    defer gw.mu.Unlock()
-    gw.Players = append(gw.Players, p)
-    gw.Map[p.Position.Y][p.Position.X] = "P" + strconv.Itoa(p.ID)
+// calculatePoints determines points earned by a player
+func (gm *GameManager) calculatePoints(player *Player) int {
+	basePoints := gm.RandSource.Intn(10) + 1
+	// Bonus for landing on special positions
+	if player.Position%5 == 0 {
+		basePoints *= 2
+	}
+	// Check for special power activation
+	if len(player.SpecialPowers) > 0 && gm.RandSource.Float32() < 0.3 {
+		power := player.SpecialPowers[gm.RandSource.Intn(len(player.SpecialPowers))]
+		gm.logEvent("Power Activated", fmt.Sprintf("%s used %s", player.Name, power))
+		if power == "Double Points" {
+			basePoints *= 2
+		} else if power == "Teleport" {
+			player.Position = gm.RandSource.Intn(BoardSize)
+		} else if power == "Shield" {
+			// Shield prevents elimination in next round
+			gm.logEvent("Shield Activated", player.Name+" is shielded for one round")
+		}
+	}
+	return basePoints
 }
 
-func (gw *GameWorld) RemovePlayer(id int) {
-    gw.mu.Lock()
-    defer gw.mu.Unlock()
-    for i, p := range gw.Players {
-        if p.ID == id {
-            gw.Map[p.Position.Y][p.Position.X] = "."
-            gw.Players = append(gw.Players[:i], gw.Players[i+1:]...)
-            break
-        }
-    }
+// triggerSpecialEvent triggers a random special event
+func (gm *GameManager) triggerSpecialEvent(player *Player) {
+	events := []string{
+		"Found a treasure chest!",
+		"Encountered a wild monster!",
+		"Stumbled upon a secret passage!",
+		"Weather changed dramatically!",
+		"Mysterious stranger appears!",
+	}
+	event := events[gm.RandSource.Intn(len(events))]
+	gm.logEvent("Special Event", fmt.Sprintf("%s: %s", player.Name, event))
+	// Random effect
+	effect := gm.RandSource.Intn(3)
+	switch effect {
+	case 0:
+		player.Score += 20
+	case 1:
+		player.Position = (player.Position + 10) % BoardSize
+	case 2:
+		player.SpecialPowers = append(player.SpecialPowers, "Extra Life")
+	}
 }
 
-func (gw *GameWorld) MovePlayer(id int, dx, dy int) bool {
-    gw.mu.Lock()
-    defer gw.mu.Unlock()
-    for i, p := range gw.Players {
-        if p.ID == id {
-            newX := p.Position.X + dx
-            newY := p.Position.Y + dy
-            if newX >= 0 && newX < gw.Width && newY >= 0 && newY < gw.Height {
-                gw.Map[p.Position.Y][p.Position.X] = "."
-                p.Position.X = newX
-                p.Position.Y = newY
-                gw.Map[newY][newX] = "P" + strconv.Itoa(p.ID)
-                gw.Players[i] = p
-                return true
-            }
-            return false
-        }
-    }
-    return false
+// checkEliminations removes players with low scores
+func (gm *GameManager) checkEliminations() {
+	activePlayers := gm.getActivePlayers()
+	if len(activePlayers) <= 1 {
+		return
+	}
+	// Find lowest score
+	lowestScore := activePlayers[0].Score
+	for _, p := range activePlayers {
+		if p.Score < lowestScore {
+			lowestScore = p.Score
+		}
+	}
+	// Eliminate players with lowest score (if more than one)
+	for i := range gm.State.Players {
+		if gm.State.Players[i].IsActive && gm.State.Players[i].Score == lowestScore {
+			gm.State.Players[i].IsActive = false
+			gm.logEvent("Elimination", fmt.Sprintf("%s was eliminated with score %d",
+				gm.State.Players[i].Name, lowestScore))
+		}
+	}
 }
 
-func (gw *GameWorld) Display() {
-    gw.mu.Lock()
-    defer gw.mu.Unlock()
-    fmt.Println("Game World Map:")
-    for _, row := range gw.Map {
-        fmt.Println(strings.Join(row, " "))
-    }
-    fmt.Println("Players:")
-    for _, p := range gw.Players {
-        fmt.Printf("ID: %d, Name: %s, Health: %d/%d, Position: (%d, %d)\n", p.ID, p.Name, p.Health, p.MaxHealth, p.Position.X, p.Position.Y)
-    }
+// updateBoard updates the visual representation of the board
+func (gm *GameManager) updateBoard() {
+	// Reset board
+	for i := range gm.State.Board {
+		gm.State.Board[i] = "_"
+	}
+	// Place players on board
+	for _, player := range gm.State.Players {
+		if player.IsActive {
+			gm.State.Board[player.Position] = strconv.Itoa(player.ID)
+		}
+	}
 }
 
-func NewPlayer(id int, name string) Player {
-    return Player{
-        ID:        id,
-        Name:      name,
-        Health:    100,
-        MaxHealth: 100,
-        Attack:    10,
-        Defense:   5,
-        Level:     1,
-        Experience: 0,
-        Inventory: []string{"Potion", "Sword"},
-        Gold:      50,
-        Position:  Point{X: 0, Y: 0},
-    }
+// getActivePlayers returns a slice of active players
+func (gm *GameManager) getActivePlayers() []Player {
+	var active []Player
+	for _, p := range gm.State.Players {
+		if p.IsActive {
+			active = append(active, p)
+		}
+	}
+	return active
 }
 
-func (p *Player) TakeDamage(damage int) {
-    actualDamage := damage - p.Defense
-    if actualDamage < 0 {
-        actualDamage = 0
-    }
-    p.Health -= actualDamage
-    if p.Health < 0 {
-        p.Health = 0
-    }
+// logEvent adds an event to the game log
+func (gm *GameManager) logEvent(eventType, description string) {
+	event := GameEvent{
+		Type:        eventType,
+		Description: description,
+		Round:       gm.State.Round,
+	}
+	gm.Events = append(gm.Events, event)
+	gm.State.GameLog = append(gm.State.GameLog, fmt.Sprintf("Round %d: [%s] %s",
+		gm.State.Round, eventType, description))
 }
 
-func (p *Player) Heal(amount int) {
-    p.Health += amount
-    if p.Health > p.MaxHealth {
-        p.Health = p.MaxHealth
-    }
+// DisplayGameState prints the current game state
+func (gm *GameManager) DisplayGameState() {
+	fmt.Println("\n=== Game State ===")
+	fmt.Printf("Round: %d\n", gm.State.Round)
+	fmt.Println("Board:", strings.Join(gm.State.Board, " "))
+	fmt.Println("Players:")
+	for _, p := range gm.State.Players {
+		status := "Active"
+		if !p.IsActive {
+			status = "Eliminated"
+		}
+		fmt.Printf("  %d. %s - Score: %d, Position: %d, Status: %s\n",
+			p.ID, p.Name, p.Score, p.Position, status)
+	}
+	fmt.Println("==================")
 }
 
-func (p *Player) GainExperience(exp int) {
-    p.Experience += exp
-    for p.Experience >= p.Level*100 {
-        p.Experience -= p.Level * 100
-        p.Level++
-        p.MaxHealth += 20
-        p.Health = p.MaxHealth
-        p.Attack += 5
-        p.Defense += 2
-        fmt.Printf("%s leveled up to level %d!\n", p.Name, p.Level)
-    }
+// DisplayGameLog prints the game event log
+func (gm *GameManager) DisplayGameLog() {
+	fmt.Println("\n=== Game Log ===")
+	for _, entry := range gm.State.GameLog {
+		fmt.Println(entry)
+	}
+	fmt.Println("================")
 }
 
-func NewMonster(id int, name string, health, attack, defense int, reward Reward) Monster {
-    return Monster{
-        ID:      id,
-        Name:    name,
-        Health:  health,
-        Attack:  attack,
-        Defense: defense,
-        Reward:  reward,
-    }
+// SaveGameState saves the current game state to a JSON file
+func (gm *GameManager) SaveGameState(filename string) error {
+	data, err := json.MarshalIndent(gm.State, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filename, data, 0644)
 }
 
-func (m *Monster) TakeDamage(damage int) {
-    actualDamage := damage - m.Defense
-    if actualDamage < 0 {
-        actualDamage = 0
-    }
-    m.Health -= actualDamage
-    if m.Health < 0 {
-        m.Health = 0
-    }
+// LoadGameState loads a game state from a JSON file
+func (gm *GameManager) LoadGameState(filename string) error {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, &gm.State)
 }
 
-func Battle(player *Player, monster *Monster) bool {
-    fmt.Printf("Battle between %s and %s!\n", player.Name, monster.Name)
-    for player.Health > 0 && monster.Health > 0 {
-        playerDamage := player.Attack + rand.Intn(10)
-        monster.TakeDamage(playerDamage)
-        fmt.Printf("%s attacks %s for %d damage. Monster health: %d\n", player.Name, monster.Name, playerDamage, monster.Health)
-        if monster.Health <= 0 {
-            fmt.Printf("%s defeated %s!\n", player.Name, monster.Name)
-            player.GainExperience(monster.Reward.Experience)
-            player.Gold += monster.Reward.Gold
-            player.Inventory = append(player.Inventory, monster.Reward.Items...)
-            return true
-        }
-        monsterDamage := monster.Attack + rand.Intn(5)
-        player.TakeDamage(monsterDamage)
-        fmt.Printf("%s attacks %s for %d damage. Player health: %d\n", monster.Name, player.Name, monsterDamage, player.Health)
-        if player.Health <= 0 {
-            fmt.Printf("%s was defeated by %s!\n", player.Name, monster.Name)
-            return false
-        }
-        time.Sleep(500 * time.Millisecond)
-    }
-    return false
+// SimulateFullGame runs a complete game simulation
+func (gm *GameManager) SimulateFullGame() {
+	for !gm.State.IsGameOver {
+		gm.PlayRound()
+		if gm.State.Round%10 == 0 {
+			gm.DisplayGameState()
+		}
+	}
+	gm.DisplayGameState()
+	gm.DisplayGameLog()
+	gm.announceWinner()
 }
 
-func SaveGame(gw *GameWorld, filename string) error {
-    data, err := json.Marshal(gw)
-    if err != nil {
-        return err
-    }
-    return os.WriteFile(filename, data, 0644)
+// announceWinner declares the game winner
+func (gm *GameManager) announceWinner() {
+	activePlayers := gm.getActivePlayers()
+	if len(activePlayers) == 0 {
+		fmt.Println("\nNo winner - all players eliminated!")
+		return
+	}
+	winner := activePlayers[0]
+	for _, p := range activePlayers {
+		if p.Score > winner.Score {
+			winner = p
+		}
+	}
+	fmt.Printf("\n🎉 Winner: %s with %d points! 🎉\n", winner.Name, winner.Score)
 }
 
-func LoadGame(filename string) (*GameWorld, error) {
-    data, err := os.ReadFile(filename)
-    if err != nil {
-        return nil, err
-    }
-    var gw GameWorld
-    err = json.Unmarshal(data, &gw)
-    if err != nil {
-        return nil, err
-    }
-    return &gw, nil
+// Helper function to generate random player names
+func generatePlayerNames(count int) []string {
+	names := []string{
+		"Alice", "Bob", "Charlie", "Diana", "Eve",
+		"Frank", "Grace", "Henry", "Ivy", "Jack",
+		"Kara", "Leo", "Mona", "Nina", "Oscar",
+		"Paul", "Quinn", "Rita", "Sam", "Tina",
+	}
+	if count > len(names) {
+		count = len(names)
+	}
+	return names[:count]
 }
 
+// Main function - entry point of the program
 func main() {
-    rand.Seed(time.Now().UnixNano())
-    scanner := bufio.NewScanner(os.Stdin)
-    fmt.Println("Welcome to Advanced Go Game Simulator!")
-    fmt.Println("Commands: new, load, move, battle, save, quit")
-    var gameWorld *GameWorld
-    playerIDCounter := 1
-    monsterIDCounter := 1
-    for {
-        fmt.Print("> ")
-        scanner.Scan()
-        command := strings.ToLower(strings.TrimSpace(scanner.Text()))
-        switch command {
-        case "new":
-            fmt.Print("Enter world width: ")
-            scanner.Scan()
-            width, _ := strconv.Atoi(scanner.Text())
-            fmt.Print("Enter world height: ")
-            scanner.Scan()
-            height, _ := strconv.Atoi(scanner.Text())
-            gameWorld = NewGameWorld(width, height)
-            fmt.Print("Enter player name: ")
-            scanner.Scan()
-            name := scanner.Text()
-            player := NewPlayer(playerIDCounter, name)
-            gameWorld.AddPlayer(player)
-            playerIDCounter++
-            fmt.Println("New game created with player", name)
-        case "load":
-            fmt.Print("Enter filename to load: ")
-            scanner.Scan()
-            filename := scanner.Text()
-            loadedWorld, err := LoadGame(filename)
-            if err != nil {
-                fmt.Println("Error loading game:", err)
-            } else {
-                gameWorld = loadedWorld
-                fmt.Println("Game loaded from", filename)
-            }
-        case "move":
-            if gameWorld == nil {
-                fmt.Println("No game world. Use 'new' or 'load' first.")
-                break
-            }
-            fmt.Print("Enter player ID to move: ")
-            scanner.Scan()
-            id, _ := strconv.Atoi(scanner.Text())
-            fmt.Print("Enter direction (up, down, left, right): ")
-            scanner.Scan()
-            dir := scanner.Text()
-            var dx, dy int
-            switch dir {
-            case "up":
-                dy = -1
-            case "down":
-                dy = 1
-            case "left":
-                dx = -1
-            case "right":
-                dx = 1
-            default:
-                fmt.Println("Invalid direction")
-                break
-            }
-            if gameWorld.MovePlayer(id, dx, dy) {
-                fmt.Println("Player moved successfully")
-            } else {
-                fmt.Println("Move failed")
-            }
-            gameWorld.Display()
-        case "battle":
-            if gameWorld == nil {
-                fmt.Println("No game world. Use 'new' or 'load' first.")
-                break
-            }
-            fmt.Print("Enter player ID for battle: ")
-            scanner.Scan()
-            playerID, _ := strconv.Atoi(scanner.Text())
-            var player *Player
-            for i, p := range gameWorld.Players {
-                if p.ID == playerID {
-                    player = &gameWorld.Players[i]
-                    break
-                }
-            }
-            if player == nil {
-                fmt.Println("Player not found")
-                break
-            }
-            monster := NewMonster(monsterIDCounter, "Goblin", 50, 8, 3, Reward{Experience: 30, Gold: 20, Items: []string{"Goblin Ear"}})
-            monsterIDCounter++
-            if Battle(player, &monster) {
-                fmt.Println("Battle won!")
-            } else {
-                fmt.Println("Battle lost!")
-                gameWorld.RemovePlayer(player.ID)
-            }
-        case "save":
-            if gameWorld == nil {
-                fmt.Println("No game world to save.")
-                break
-            }
-            fmt.Print("Enter filename to save: ")
-            scanner.Scan()
-            filename := scanner.Text()
-            err := SaveGame(gameWorld, filename)
-            if err != nil {
-                fmt.Println("Error saving game:", err)
-            } else {
-                fmt.Println("Game saved to", filename)
-            }
-        case "quit":
-            fmt.Println("Goodbye!")
-            return
-        default:
-            fmt.Println("Unknown command. Try: new, load, move, battle, save, quit")
-        }
-    }
+	fmt.Println("=== Advanced Go Game Simulator ===")
+	fmt.Println("A complex game simulation with multiple players, rounds, and events")
+
+	// Initialize game manager
+	gm := &GameManager{}
+
+	// Get number of players
+	playerCount := 5
+	if len(os.Args) > 1 {
+		if count, err := strconv.Atoi(os.Args[1]); err == nil && count > 0 && count <= MaxPlayers {
+			playerCount = count
+		}
+	}
+
+	// Generate player names
+	playerNames := generatePlayerNames(playerCount)
+
+	// Initialize game
+	gm.InitializeGame(playerNames)
+	gm.DisplayGameState()
+
+	// Ask user for simulation mode
+	fmt.Print("\nChoose mode: (1) Auto-simulate full game, (2) Step through rounds: ")
+	var choice string
+	fmt.Scanln(&choice)
+
+	if choice == "1" {
+		// Auto-simulate
+		gm.SimulateFullGame()
+	} else {
+		// Step through rounds
+		fmt.Println("\nStepping through rounds. Press Enter to continue, 'q' to quit.")
+		for !gm.State.IsGameOver {
+			gm.PlayRound()
+			gm.DisplayGameState()
+			fmt.Print("Press Enter to continue...")
+			var input string
+			fmt.Scanln(&input)
+			if strings.ToLower(input) == "q" {
+				break
+			}
+		}
+		if gm.State.IsGameOver {
+			gm.announceWinner()
+		}
+	}
+
+	// Save game state
+	if err := gm.SaveGameState("game_state.json"); err != nil {
+		fmt.Printf("Error saving game: %v\n", err)
+	} else {
+		fmt.Println("Game state saved to game_state.json")
+	}
+
+	// Demonstrate loading (optional)
+	fmt.Print("\nLoad saved game? (y/n): ")
+	var loadChoice string
+	fmt.Scanln(&loadChoice)
+	if strings.ToLower(loadChoice) == "y" {
+		loadedGM := &GameManager{}
+		if err := loadedGM.LoadGameState("game_state.json"); err != nil {
+			fmt.Printf("Error loading game: %v\n", err)
+		} else {
+			fmt.Println("Game loaded successfully!")
+			loadedGM.DisplayGameState()
+		}
+	}
+
+	fmt.Println("\n=== Game Simulator Ended ===")
 }
