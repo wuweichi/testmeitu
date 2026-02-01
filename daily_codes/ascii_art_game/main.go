@@ -11,139 +11,109 @@ import (
 )
 
 type GameState struct {
-	Score      int
-	Level      int
-	Lives      int
-	TimeLeft   int
-	IsRunning  bool
-	PlayerX    int
-	PlayerY    int
-	Enemies    []Enemy
+	Score       int
+	Level       int
+	Lives       int
+	TimeLeft    int
+	PlayerPos   int
+	Enemies     []Enemy
 	Projectiles []Projectile
-	PowerUps   []PowerUp
-	Obstacles  []Obstacle
-	Messages   []string
+	PowerUps    []PowerUp
+	IsPaused    bool
+	IsGameOver  bool
 }
 
 type Enemy struct {
-	X, Y       int
-	Symbol     string
-	Speed      int
-	Health     int
-	Direction  int
-	IsActive   bool
+	ID        int
+	X         int
+	Y         int
+	Speed     int
+	Direction int
+	Health    int
+	Symbol    string
 }
 
 type Projectile struct {
-	X, Y       int
-	Symbol     string
-	Speed      int
-	Direction  int
-	IsActive   bool
+	X      int
+	Y      int
+	Speed  int
+	Damage int
+	Symbol string
 }
 
 type PowerUp struct {
-	X, Y       int
-	Symbol     string
-	Type       string
-	IsActive   bool
-}
-
-type Obstacle struct {
-	X, Y       int
-	Symbol     string
-	IsActive   bool
+	X      int
+	Y      int
+	Type   string
+	Symbol string
 }
 
 const (
 	ScreenWidth  = 80
 	ScreenHeight = 24
 	PlayerSymbol = "@"
-	EnemySymbol  = "*"
-	ProjectileSymbol = "|"
-	PowerUpSymbol = "+"
-	ObstacleSymbol = "#"
-	InitialLives = 3
-	InitialTime = 60
+	EmptySymbol  = " "
+	WallSymbol   = "#"
+	HeartSymbol  = "♥"
+	StarSymbol   = "★"
 )
 
-var gameState GameState
+var (
+	gameState GameState
+	inputChan = make(chan string, 1)
+)
 
 func initGame() {
-	rand.Seed(time.Now().UnixNano())
 	gameState = GameState{
-		Score:      0,
-		Level:      1,
-		Lives:      InitialLives,
-		TimeLeft:   InitialTime,
-		IsRunning:  true,
-		PlayerX:    ScreenWidth / 2,
-		PlayerY:    ScreenHeight - 2,
-		Enemies:    []Enemy{},
-		Projectiles: []Projectile{},
-		PowerUps:   []PowerUp{},
-		Obstacles:  []Obstacle{},
-		Messages:   []string{"Welcome to ASCII Art Game!", "Use WASD to move, Space to shoot."},
+		Score:     0,
+		Level:     1,
+		Lives:     3,
+		TimeLeft:  60,
+		PlayerPos: ScreenWidth / 2,
+		Enemies:   []Enemy{},
+		IsPaused:  false,
+		IsGameOver: false,
 	}
-	spawnEnemies(5)
-	spawnPowerUps(2)
-	spawnObstacles(10)
+	spawnEnemies()
+	spawnPowerUps()
 }
 
-func spawnEnemies(count int) {
-	for i := 0; i < count; i++ {
-		x := rand.Intn(ScreenWidth-2) + 1
-		y := rand.Intn(ScreenHeight/2) + 1
+func spawnEnemies() {
+	rand.Seed(time.Now().UnixNano())
+	for i := 0; i < 5+gameState.Level; i++ {
 		enemy := Enemy{
-			X:         x,
-			Y:         y,
-			Symbol:    EnemySymbol,
-			Speed:     1,
-			Health:    1,
-			Direction: rand.Intn(4),
-			IsActive:  true,
+			ID:        i,
+			X:         rand.Intn(ScreenWidth-2) + 1,
+			Y:         rand.Intn(ScreenHeight/2) + 1,
+			Speed:     1 + rand.Intn(2),
+			Direction: rand.Intn(2)*2 - 1,
+			Health:    2 + gameState.Level,
+			Symbol:    "☠",
 		}
 		gameState.Enemies = append(gameState.Enemies, enemy)
 	}
 }
 
-func spawnPowerUps(count int) {
-	for i := 0; i < count; i++ {
-		x := rand.Intn(ScreenWidth-2) + 1
-		y := rand.Intn(ScreenHeight-2) + 1
+func spawnPowerUps() {
+	rand.Seed(time.Now().UnixNano())
+	for i := 0; i < 3; i++ {
 		powerUp := PowerUp{
-			X:        x,
-			Y:        y,
-			Symbol:   PowerUpSymbol,
-			Type:     []string{"health", "time", "score"}[rand.Intn(3)],
-			IsActive: true,
+			X:      rand.Intn(ScreenWidth-2) + 1,
+			Y:      rand.Intn(ScreenHeight-2) + 1,
+			Type:   []string{"health", "time", "score"}[rand.Intn(3)],
+			Symbol: []string{HeartSymbol, StarSymbol, "$"}[rand.Intn(3)],
 		}
 		gameState.PowerUps = append(gameState.PowerUps, powerUp)
 	}
 }
 
-func spawnObstacles(count int) {
-	for i := 0; i < count; i++ {
-		x := rand.Intn(ScreenWidth-2) + 1
-		y := rand.Intn(ScreenHeight-2) + 1
-		obstacle := Obstacle{
-			X:        x,
-			Y:        y,
-			Symbol:   ObstacleSymbol,
-			IsActive: true,
-		}
-		gameState.Obstacles = append(gameState.Obstacles, obstacle)
-	}
-}
-
 func updateGame() {
-	if !gameState.IsRunning {
+	if gameState.IsPaused || gameState.IsGameOver {
 		return
 	}
 	gameState.TimeLeft--
 	if gameState.TimeLeft <= 0 {
-		gameState.Messages = append(gameState.Messages, "Time's up! Game Over.")
-		gameState.IsRunning = false
+		gameState.IsGameOver = true
 		return
 	}
 	updateEnemies()
@@ -151,251 +121,187 @@ func updateGame() {
 	checkCollisions()
 	if len(gameState.Enemies) == 0 {
 		gameState.Level++
-		gameState.Messages = append(gameState.Messages, "Level up! Level "+strconv.Itoa(gameState.Level))
-		spawnEnemies(5 + gameState.Level)
-		spawnPowerUps(2)
-		spawnObstacles(10)
+		gameState.TimeLeft += 30
+		spawnEnemies()
+		spawnPowerUps()
 	}
 }
 
 func updateEnemies() {
 	for i := range gameState.Enemies {
-		if !gameState.Enemies[i].IsActive {
-			continue
+		gameState.Enemies[i].X += gameState.Enemies[i].Direction * gameState.Enemies[i].Speed
+		if gameState.Enemies[i].X <= 0 || gameState.Enemies[i].X >= ScreenWidth-1 {
+			gameState.Enemies[i].Direction *= -1
 		}
-		switch gameState.Enemies[i].Direction {
-		case 0:
-			gameState.Enemies[i].Y -= gameState.Enemies[i].Speed
-		case 1:
-			gameState.Enemies[i].X += gameState.Enemies[i].Speed
-		case 2:
-			gameState.Enemies[i].Y += gameState.Enemies[i].Speed
-		case 3:
-			gameState.Enemies[i].X -= gameState.Enemies[i].Speed
-		}
-		if gameState.Enemies[i].X < 1 || gameState.Enemies[i].X >= ScreenWidth-1 ||
-			gameState.Enemies[i].Y < 1 || gameState.Enemies[i].Y >= ScreenHeight-1 {
-			gameState.Enemies[i].Direction = rand.Intn(4)
+		if rand.Intn(100) < 5 {
+			fireProjectile(gameState.Enemies[i].X, gameState.Enemies[i].Y+1, 1, 1, "↓")
 		}
 	}
 }
 
 func updateProjectiles() {
-	for i := range gameState.Projectiles {
-		if !gameState.Projectiles[i].IsActive {
-			continue
-		}
-		switch gameState.Projectiles[i].Direction {
-		case 0:
-			gameState.Projectiles[i].Y -= gameState.Projectiles[i].Speed
-		case 1:
-			gameState.Projectiles[i].X += gameState.Projectiles[i].Speed
-		case 2:
-			gameState.Projectiles[i].Y += gameState.Projectiles[i].Speed
-		case 3:
-			gameState.Projectiles[i].X -= gameState.Projectiles[i].Speed
-		}
-		if gameState.Projectiles[i].X < 0 || gameState.Projectiles[i].X >= ScreenWidth ||
-			gameState.Projectiles[i].Y < 0 || gameState.Projectiles[i].Y >= ScreenHeight {
-			gameState.Projectiles[i].IsActive = false
+	for i := 0; i < len(gameState.Projectiles); i++ {
+		gameState.Projectiles[i].Y += gameState.Projectiles[i].Speed
+		if gameState.Projectiles[i].Y < 0 || gameState.Projectiles[i].Y >= ScreenHeight {
+			gameState.Projectiles = append(gameState.Projectiles[:i], gameState.Projectiles[i+1:]...)
+			i--
 		}
 	}
-	activeProjectiles := []Projectile{}
-	for _, p := range gameState.Projectiles {
-		if p.IsActive {
-			activeProjectiles = append(activeProjectiles, p)
-		}
-	}
-	gameState.Projectiles = activeProjectiles
 }
 
 func checkCollisions() {
-	for i, enemy := range gameState.Enemies {
-		if !enemy.IsActive {
-			continue
-		}
-		if enemy.X == gameState.PlayerX && enemy.Y == gameState.PlayerY {
+	for i := 0; i < len(gameState.Projectiles); i++ {
+		proj := &gameState.Projectiles[i]
+		if proj.Y == ScreenHeight-2 && proj.X == gameState.PlayerPos {
 			gameState.Lives--
-			gameState.Messages = append(gameState.Messages, "Hit by enemy! Lives: "+strconv.Itoa(gameState.Lives))
-			gameState.Enemies[i].IsActive = false
+			gameState.Projectiles = append(gameState.Projectiles[:i], gameState.Projectiles[i+1:]...)
+			i--
 			if gameState.Lives <= 0 {
-				gameState.Messages = append(gameState.Messages, "No lives left! Game Over.")
-				gameState.IsRunning = false
+				gameState.IsGameOver = true
 			}
-		}
-		for j, projectile := range gameState.Projectiles {
-			if !projectile.IsActive {
-				continue
-			}
-			if enemy.X == projectile.X && enemy.Y == projectile.Y {
-				gameState.Enemies[i].Health--
-				gameState.Projectiles[j].IsActive = false
-				if gameState.Enemies[i].Health <= 0 {
-					gameState.Enemies[i].IsActive = false
-					gameState.Score += 10
-					gameState.Messages = append(gameState.Messages, "Enemy destroyed! Score: "+strconv.Itoa(gameState.Score))
-				}
-			}
-		}
-	}
-	activeEnemies := []Enemy{}
-	for _, e := range gameState.Enemies {
-		if e.IsActive {
-			activeEnemies = append(activeEnemies, e)
-		}
-	}
-	gameState.Enemies = activeEnemies
-	for i, powerUp := range gameState.PowerUps {
-		if !powerUp.IsActive {
 			continue
 		}
-		if powerUp.X == gameState.PlayerX && powerUp.Y == gameState.PlayerY {
-			gameState.PowerUps[i].IsActive = false
-			switch powerUp.Type {
+		for j := 0; j < len(gameState.Enemies); j++ {
+			enemy := &gameState.Enemies[j]
+			if proj.X == enemy.X && proj.Y == enemy.Y {
+				enemy.Health -= proj.Damage
+				gameState.Projectiles = append(gameState.Projectiles[:i], gameState.Projectiles[i+1:]...)
+				i--
+				if enemy.Health <= 0 {
+					gameState.Score += 10 * gameState.Level
+					gameState.Enemies = append(gameState.Enemies[:j], gameState.Enemies[j+1:]...)
+					j--
+				}
+				break
+			}
+		}
+	}
+	for i := 0; i < len(gameState.PowerUps); i++ {
+		pUp := &gameState.PowerUps[i]
+		if pUp.X == gameState.PlayerPos && pUp.Y == ScreenHeight-2 {
+			switch pUp.Type {
 			case "health":
 				gameState.Lives++
-				gameState.Messages = append(gameState.Messages, "Health power-up! Lives: "+strconv.Itoa(gameState.Lives))
 			case "time":
 				gameState.TimeLeft += 10
-				gameState.Messages = append(gameState.Messages, "Time power-up! Time left: "+strconv.Itoa(gameState.TimeLeft))
 			case "score":
 				gameState.Score += 50
-				gameState.Messages = append(gameState.Messages, "Score power-up! Score: "+strconv.Itoa(gameState.Score))
 			}
-		}
-	}
-	activePowerUps := []PowerUp{}
-	for _, p := range gameState.PowerUps {
-		if p.IsActive {
-			activePowerUps = append(activePowerUps, p)
-		}
-	}
-	gameState.PowerUps = activePowerUps
-	for _, obstacle := range gameState.Obstacles {
-		if obstacle.X == gameState.PlayerX && obstacle.Y == gameState.PlayerY {
-			gameState.Messages = append(gameState.Messages, "Hit obstacle!")
+			gameState.PowerUps = append(gameState.PowerUps[:i], gameState.PowerUps[i+1:]...)
+			i--
 		}
 	}
 }
 
-func shootProjectile() {
-	if !gameState.IsRunning {
-		return
+func fireProjectile(x, y, speed, damage int, symbol string) {
+	proj := Projectile{
+		X:      x,
+		Y:      y,
+		Speed:  speed,
+		Damage: damage,
+		Symbol: symbol,
 	}
-	projectile := Projectile{
-		X:         gameState.PlayerX,
-		Y:         gameState.PlayerY - 1,
-		Symbol:    ProjectileSymbol,
-		Speed:     2,
-		Direction: 0,
-		IsActive:  true,
-	}
-	gameState.Projectiles = append(gameState.Projectiles, projectile)
-}
-
-func movePlayer(dx, dy int) {
-	if !gameState.IsRunning {
-		return
-	}
-	newX := gameState.PlayerX + dx
-	newY := gameState.PlayerY + dy
-	if newX >= 0 && newX < ScreenWidth && newY >= 0 && newY < ScreenHeight {
-		gameState.PlayerX = newX
-		gameState.PlayerY = newY
-	}
-}
-
-func renderScreen() {
-	fmt.Print("\033[2J\033[H")
-	fmt.Println("ASCII Art Game - Score:", gameState.Score, "Level:", gameState.Level, "Lives:", gameState.Lives, "Time:", gameState.TimeLeft)
-	fmt.Println(strings.Repeat("=", ScreenWidth))
-	screen := make([][]string, ScreenHeight)
-	for i := range screen {
-		screen[i] = make([]string, ScreenWidth)
-		for j := range screen[i] {
-			screen[i][j] = " "
-		}
-	}
-	screen[gameState.PlayerY][gameState.PlayerX] = PlayerSymbol
-	for _, enemy := range gameState.Enemies {
-		if enemy.IsActive {
-			screen[enemy.Y][enemy.X] = enemy.Symbol
-		}
-	}
-	for _, projectile := range gameState.Projectiles {
-		if projectile.IsActive {
-			screen[projectile.Y][projectile.X] = projectile.Symbol
-		}
-	}
-	for _, powerUp := range gameState.PowerUps {
-		if powerUp.IsActive {
-			screen[powerUp.Y][powerUp.X] = powerUp.Symbol
-		}
-	}
-	for _, obstacle := range gameState.Obstacles {
-		if obstacle.IsActive {
-			screen[obstacle.Y][obstacle.X] = obstacle.Symbol
-		}
-	}
-	for i := 0; i < ScreenHeight; i++ {
-		for j := 0; j < ScreenWidth; j++ {
-			fmt.Print(screen[i][j])
-		}
-		fmt.Println()
-	}
-	fmt.Println(strings.Repeat("=", ScreenWidth))
-	for _, msg := range gameState.Messages {
-		fmt.Println(msg)
-	}
-	gameState.Messages = []string{}
+	gameState.Projectiles = append(gameState.Projectiles, proj)
 }
 
 func handleInput(input string) {
 	switch input {
-	case "w":
-		movePlayer(0, -1)
 	case "a":
-		movePlayer(-1, 0)
-	case "s":
-		movePlayer(0, 1)
+		if gameState.PlayerPos > 1 {
+			gameState.PlayerPos--
+		}
 	case "d":
-		movePlayer(1, 0)
+		if gameState.PlayerPos < ScreenWidth-2 {
+			gameState.PlayerPos++
+		}
 	case " ":
-		shootProjectile()
+		fireProjectile(gameState.PlayerPos, ScreenHeight-3, -1, 1, "↑")
+	case "p":
+		gameState.IsPaused = !gameState.IsPaused
+	case "r":
+		if gameState.IsGameOver {
+			initGame()
+		}
 	case "q":
-		gameState.IsRunning = false
-		gameState.Messages = append(gameState.Messages, "Game quit.")
+		os.Exit(0)
+	}
+}
+
+func drawScreen() {
+	fmt.Print("\033[2J\033[H") // Clear screen and move cursor to top-left
+	var screen [ScreenHeight][ScreenWidth]string
+	for y := 0; y < ScreenHeight; y++ {
+		for x := 0; x < ScreenWidth; x++ {
+			if y == 0 || y == ScreenHeight-1 || x == 0 || x == ScreenWidth-1 {
+				screen[y][x] = WallSymbol
+			} else {
+				screen[y][x] = EmptySymbol
+			}
+		}
+	}
+	screen[ScreenHeight-2][gameState.PlayerPos] = PlayerSymbol
+	for _, enemy := range gameState.Enemies {
+		if enemy.Y >= 0 && enemy.Y < ScreenHeight && enemy.X >= 0 && enemy.X < ScreenWidth {
+			screen[enemy.Y][enemy.X] = enemy.Symbol
+		}
+	}
+	for _, proj := range gameState.Projectiles {
+		if proj.Y >= 0 && proj.Y < ScreenHeight && proj.X >= 0 && proj.X < ScreenWidth {
+			screen[proj.Y][proj.X] = proj.Symbol
+		}
+	}
+	for _, pUp := range gameState.PowerUps {
+		if pUp.Y >= 0 && pUp.Y < ScreenHeight && pUp.X >= 0 && pUp.X < ScreenWidth {
+			screen[pUp.Y][pUp.X] = pUp.Symbol
+		}
+	}
+	for y := 0; y < ScreenHeight; y++ {
+		for x := 0; x < ScreenWidth; x++ {
+			fmt.Print(screen[y][x])
+		}
+		fmt.Println()
+	}
+	drawHUD()
+}
+
+func drawHUD() {
+	hud := fmt.Sprintf("Score: %d | Level: %d | Lives: %d | Time: %d",
+		gameState.Score, gameState.Level, gameState.Lives, gameState.TimeLeft)
+	fmt.Println(strings.Repeat("-", ScreenWidth))
+	fmt.Println(hud)
+	if gameState.IsPaused {
+		fmt.Println("PAUSED - Press 'p' to resume")
+	}
+	if gameState.IsGameOver {
+		fmt.Println("GAME OVER! Press 'r' to restart or 'q' to quit")
+	}
+	fmt.Println("Controls: A/D to move, SPACE to shoot, P to pause, Q to quit")
+}
+
+func inputListener() {
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		char, _, err := reader.ReadRune()
+		if err != nil {
+			close(inputChan)
+			return
+		}
+		inputChan <- strings.ToLower(string(char))
 	}
 }
 
 func main() {
 	initGame()
-	reader := bufio.NewReader(os.Stdin)
-	inputChan := make(chan string)
-	go func() {
-		for {
-			char, _, err := reader.ReadRune()
-			if err != nil {
-				close(inputChan)
-				return
-			}
-			inputChan <- string(char)
-		}
-	}()
-	gameLoop:
+	go inputListener()
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
 	for {
 		select {
 		case input := <-inputChan:
-			handleInput(strings.ToLower(input))
-		default:
+			handleInput(input)
+		case <-ticker.C:
 			updateGame()
-			renderScreen()
-			if !gameState.IsRunning {
-				break gameLoop
-			}
-			time.Sleep(100 * time.Millisecond)
+			drawScreen()
 		}
 	}
-	fmt.Println("Final Score:", gameState.Score, "Level:", gameState.Level)
-	fmt.Println("Thanks for playing!")
 }
