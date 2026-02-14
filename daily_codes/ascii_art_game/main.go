@@ -8,359 +8,364 @@ import (
     "strconv"
     "strings"
     "time"
-    "unicode/utf8"
 )
 
+// ASCII art data structures and functions
 const (
     screenWidth  = 80
     screenHeight = 24
-    maxEnemies   = 50
-    maxStars     = 100
-    maxParticles = 200
-    playerSpeed  = 2
-    bulletSpeed  = 3
-    enemySpeed   = 1
-    gameFPS      = 30
 )
 
-type Vector2 struct {
-    X, Y int
+type Pixel struct {
+    Char  rune
+    Color string
 }
 
+type Screen [screenHeight][screenWidth]Pixel
+
+func NewScreen() Screen {
+    var s Screen
+    for y := 0; y < screenHeight; y++ {
+        for x := 0; x < screenWidth; x++ {
+            s[y][x] = Pixel{' ', ""}
+        }
+    }
+    return s
+}
+
+func (s *Screen) Clear() {
+    for y := 0; y < screenHeight; y++ {
+        for x := 0; x < screenWidth; x++ {
+            s[y][x] = Pixel{' ', ""}
+        }
+    }
+}
+
+func (s *Screen) DrawPixel(x, y int, char rune, color string) {
+    if x >= 0 && x < screenWidth && y >= 0 && y < screenHeight {
+        s[y][x] = Pixel{char, color}
+    }
+}
+
+func (s *Screen) DrawText(x, y int, text string, color string) {
+    for i, ch := range text {
+        s.DrawPixel(x+i, y, ch, color)
+    }
+}
+
+func (s *Screen) DrawRect(x1, y1, x2, y2 int, char rune, color string) {
+    for y := y1; y <= y2; y++ {
+        for x := x1; x <= x2; x++ {
+            s.DrawPixel(x, y, char, color)
+        }
+    }
+}
+
+func (s *Screen) DrawLine(x1, y1, x2, y2 int, char rune, color string) {
+    dx := abs(x2 - x1)
+    dy := abs(y2 - y1)
+    sx := 1
+    if x1 > x2 {
+        sx = -1
+    }
+    sy := 1
+    if y1 > y2 {
+        sy = -1
+    }
+    err := dx - dy
+    for {
+        s.DrawPixel(x1, y1, char, color)
+        if x1 == x2 && y1 == y2 {
+            break
+        }
+        e2 := 2 * err
+        if e2 > -dy {
+            err -= dy
+            x1 += sx
+        }
+        if e2 < dx {
+            err += dx
+            y1 += sy
+        }
+    }
+}
+
+func (s *Screen) Render() {
+    fmt.Print("\033[2J\033[H") // Clear screen and move cursor to top-left
+    for y := 0; y < screenHeight; y++ {
+        for x := 0; x < screenWidth; x++ {
+            pixel := s[y][x]
+            if pixel.Color != "" {
+                fmt.Printf("\033[%sm%c\033[0m", pixel.Color, pixel.Char)
+            } else {
+                fmt.Printf("%c", pixel.Char)
+            }
+        }
+        fmt.Println()
+    }
+}
+
+// Game entities
 type Player struct {
-    Position Vector2
-    Health   int
-    Score    int
-    Symbol   rune
+    X, Y int
+    Char rune
 }
 
-type Bullet struct {
-    Position Vector2
-    Active   bool
-    Symbol   rune
+func NewPlayer(x, y int) Player {
+    return Player{x, y, '@'}
+}
+
+func (p *Player) Move(dx, dy int) {
+    p.X += dx
+    p.Y += dy
+    if p.X < 0 {
+        p.X = 0
+    }
+    if p.X >= screenWidth {
+        p.X = screenWidth - 1
+    }
+    if p.Y < 0 {
+        p.Y = 0
+    }
+    if p.Y >= screenHeight {
+        p.Y = screenHeight - 1
+    }
 }
 
 type Enemy struct {
-    Position Vector2
-    Active   bool
-    Health   int
-    Symbol   rune
-    Type     int
+    X, Y int
+    Char rune
+    Alive bool
 }
 
-type Star struct {
-    Position Vector2
-    Brightness int
+func NewEnemy(x, y int) Enemy {
+    return Enemy{x, y, 'E', true}
 }
 
-type Particle struct {
-    Position Vector2
-    Velocity Vector2
-    Life     int
-    Symbol   rune
+func (e *Enemy) Update(playerX, playerY int) {
+    if !e.Alive {
+        return
+    }
+    dx := 0
+    dy := 0
+    if e.X < playerX {
+        dx = 1
+    } else if e.X > playerX {
+        dx = -1
+    }
+    if e.Y < playerY {
+        dy = 1
+    } else if e.Y > playerY {
+        dy = -1
+    }
+    e.X += dx
+    e.Y += dy
+    if e.X < 0 {
+        e.X = 0
+    }
+    if e.X >= screenWidth {
+        e.X = screenWidth - 1
+    }
+    if e.Y < 0 {
+        e.Y = 0
+    }
+    if e.Y >= screenHeight {
+        e.Y = screenHeight - 1
+    }
 }
 
+type Projectile struct {
+    X, Y int
+    DX, DY int
+    Char rune
+    Active bool
+}
+
+func NewProjectile(x, y, dx, dy int) Projectile {
+    return Projectile{x, y, dx, dy, '*', true}
+}
+
+func (p *Projectile) Update() {
+    if !p.Active {
+        return
+    }
+    p.X += p.DX
+    p.Y += p.DY
+    if p.X < 0 || p.X >= screenWidth || p.Y < 0 || p.Y >= screenHeight {
+        p.Active = false
+    }
+}
+
+// Game state
 type Game struct {
-    Player     Player
-    Bullets    [100]Bullet
-    Enemies    [maxEnemies]Enemy
-    Stars      [maxStars]Star
-    Particles  [maxParticles]Particle
-    GameOver   bool
-    Level      int
-    FrameCount int
-    Input      string
+    Screen   Screen
+    Player   Player
+    Enemies  []Enemy
+    Projectiles []Projectile
+    Score    int
+    Running  bool
 }
 
-func (g *Game) Init() {
+func NewGame() *Game {
     rand.Seed(time.Now().UnixNano())
-    g.Player = Player{
-        Position: Vector2{screenWidth / 2, screenHeight - 2},
-        Health:   100,
+    game := &Game{
+        Screen:   NewScreen(),
+        Player:   NewPlayer(screenWidth/2, screenHeight/2),
+        Enemies:  make([]Enemy, 0),
+        Projectiles: make([]Projectile, 0),
         Score:    0,
-        Symbol:   'A',
+        Running:  true,
     }
-    for i := range g.Bullets {
-        g.Bullets[i].Active = false
-        g.Bullets[i].Symbol = '|'
+    for i := 0; i < 5; i++ {
+        game.Enemies = append(game.Enemies, NewEnemy(rand.Intn(screenWidth), rand.Intn(screenHeight)))
     }
-    for i := range g.Enemies {
-        g.Enemies[i].Active = false
-    }
-    for i := range g.Stars {
-        g.Stars[i].Position = Vector2{rand.Intn(screenWidth), rand.Intn(screenHeight)}
-        g.Stars[i].Brightness = rand.Intn(2) + 1
-    }
-    g.GameOver = false
-    g.Level = 1
-    g.FrameCount = 0
-    g.SpawnEnemies()
+    return game
 }
 
-func (g *Game) SpawnEnemies() {
-    count := 5 + g.Level*2
-    if count > maxEnemies {
-        count = maxEnemies
-    }
-    spawned := 0
-    for i := range g.Enemies {
-        if !g.Enemies[i].Active && spawned < count {
-            g.Enemies[i].Active = true
-            g.Enemies[i].Position = Vector2{rand.Intn(screenWidth - 2) + 1, rand.Intn(5) + 1}
-            g.Enemies[i].Health = 10 + g.Level*5
-            g.Enemies[i].Type = rand.Intn(3)
-            switch g.Enemies[i].Type {
-            case 0:
-                g.Enemies[i].Symbol = 'V'
-            case 1:
-                g.Enemies[i].Symbol = 'W'
-            case 2:
-                g.Enemies[i].Symbol = 'M'
-            }
-            spawned++
-        }
+func (g *Game) HandleInput(input string) {
+    switch input {
+    case "w":
+        g.Player.Move(0, -1)
+    case "s":
+        g.Player.Move(0, 1)
+    case "a":
+        g.Player.Move(-1, 0)
+    case "d":
+        g.Player.Move(1, 0)
+    case " ":
+        g.Projectiles = append(g.Projectiles, NewProjectile(g.Player.X, g.Player.Y, 1, 0))
+        g.Projectiles = append(g.Projectiles, NewProjectile(g.Player.X, g.Player.Y, -1, 0))
+        g.Projectiles = append(g.Projectiles, NewProjectile(g.Player.X, g.Player.Y, 0, 1))
+        g.Projectiles = append(g.Projectiles, NewProjectile(g.Player.X, g.Player.Y, 0, -1))
+    case "q":
+        g.Running = false
     }
 }
 
 func (g *Game) Update() {
-    if g.GameOver {
-        return
+    // Update enemies
+    for i := range g.Enemies {
+        g.Enemies[i].Update(g.Player.X, g.Player.Y)
     }
-    g.FrameCount++
-    g.UpdateStars()
-    g.UpdateParticles()
-    g.HandleInput()
-    g.UpdateBullets()
-    g.UpdateEnemies()
-    g.CheckCollisions()
-    if g.FrameCount%300 == 0 {
-        g.Level++
-        g.SpawnEnemies()
+    // Update projectiles
+    for i := range g.Projectiles {
+        g.Projectiles[i].Update()
     }
-}
-
-func (g *Game) UpdateStars() {
-    for i := range g.Stars {
-        g.Stars[i].Position.Y++
-        if g.Stars[i].Position.Y >= screenHeight {
-            g.Stars[i].Position = Vector2{rand.Intn(screenWidth), 0}
-            g.Stars[i].Brightness = rand.Intn(2) + 1
+    // Check collisions
+    for i := range g.Projectiles {
+        if !g.Projectiles[i].Active {
+            continue
         }
-    }
-}
-
-func (g *Game) UpdateParticles() {
-    for i := range g.Particles {
-        if g.Particles[i].Life > 0 {
-            g.Particles[i].Position.X += g.Particles[i].Velocity.X
-            g.Particles[i].Position.Y += g.Particles[i].Velocity.Y
-            g.Particles[i].Life--
-            if g.Particles[i].Position.X < 0 || g.Particles[i].Position.X >= screenWidth ||
-                g.Particles[i].Position.Y < 0 || g.Particles[i].Position.Y >= screenHeight {
-                g.Particles[i].Life = 0
+        for j := range g.Enemies {
+            if !g.Enemies[j].Alive {
+                continue
+            }
+            if g.Projectiles[i].X == g.Enemies[j].X && g.Projectiles[i].Y == g.Enemies[j].Y {
+                g.Enemies[j].Alive = false
+                g.Projectiles[i].Active = false
+                g.Score += 10
             }
         }
     }
-}
-
-func (g *Game) HandleInput() {
-    switch g.Input {
-    case "a":
-        if g.Player.Position.X > 1 {
-            g.Player.Position.X -= playerSpeed
+    // Check player-enemy collisions
+    for i := range g.Enemies {
+        if !g.Enemies[i].Alive {
+            continue
         }
-    case "d":
-        if g.Player.Position.X < screenWidth-2 {
-            g.Player.Position.X += playerSpeed
+        if g.Player.X == g.Enemies[i].X && g.Player.Y == g.Enemies[i].Y {
+            g.Running = false
         }
-    case "w":
-        if g.Player.Position.Y > 1 {
-            g.Player.Position.Y -= playerSpeed
-        }
-    case "s":
-        if g.Player.Position.Y < screenHeight-2 {
-            g.Player.Position.Y += playerSpeed
-        }
-    case " ":
-        g.ShootBullet()
-    case "q":
-        g.GameOver = true
     }
-    g.Input = ""
-}
-
-func (g *Game) ShootBullet() {
-    for i := range g.Bullets {
-        if !g.Bullets[i].Active {
-            g.Bullets[i].Active = true
-            g.Bullets[i].Position = Vector2{g.Player.Position.X, g.Player.Position.Y - 1}
+    // Respawn enemies if all dead
+    allDead := true
+    for i := range g.Enemies {
+        if g.Enemies[i].Alive {
+            allDead = false
             break
         }
     }
-}
-
-func (g *Game) UpdateBullets() {
-    for i := range g.Bullets {
-        if g.Bullets[i].Active {
-            g.Bullets[i].Position.Y -= bulletSpeed
-            if g.Bullets[i].Position.Y < 0 {
-                g.Bullets[i].Active = false
-            }
-        }
-    }
-}
-
-func (g *Game) UpdateEnemies() {
-    for i := range g.Enemies {
-        if g.Enemies[i].Active {
-            g.Enemies[i].Position.Y += enemySpeed
-            if g.Enemies[i].Position.Y >= screenHeight-1 {
-                g.Enemies[i].Active = false
-                g.Player.Health -= 10
-                if g.Player.Health <= 0 {
-                    g.GameOver = true
-                }
-            }
-            if g.FrameCount%20 == 0 {
-                g.Enemies[i].Position.X += rand.Intn(3) - 1
-                if g.Enemies[i].Position.X < 1 {
-                    g.Enemies[i].Position.X = 1
-                }
-                if g.Enemies[i].Position.X >= screenWidth-1 {
-                    g.Enemies[i].Position.X = screenWidth - 2
-                }
-            }
-        }
-    }
-}
-
-func (g *Game) CheckCollisions() {
-    for bi := range g.Bullets {
-        if !g.Bullets[bi].Active {
-            continue
-        }
-        for ei := range g.Enemies {
-            if !g.Enemies[ei].Active {
-                continue
-            }
-            if g.Bullets[bi].Position.X == g.Enemies[ei].Position.X &&
-                g.Bullets[bi].Position.Y == g.Enemies[ei].Position.Y {
-                g.Bullets[bi].Active = false
-                g.Enemies[ei].Health -= 25
-                g.CreateExplosion(g.Enemies[ei].Position.X, g.Enemies[ei].Position.Y)
-                if g.Enemies[ei].Health <= 0 {
-                    g.Enemies[ei].Active = false
-                    g.Player.Score += 100 * g.Level
-                }
-                break
-            }
-        }
-    }
-    for ei := range g.Enemies {
-        if !g.Enemies[ei].Active {
-            continue
-        }
-        if g.Enemies[ei].Position.X == g.Player.Position.X &&
-            g.Enemies[ei].Position.Y == g.Player.Position.Y {
-            g.Enemies[ei].Active = false
-            g.Player.Health -= 30
-            g.CreateExplosion(g.Player.Position.X, g.Player.Position.Y)
-            if g.Player.Health <= 0 {
-                g.GameOver = true
-            }
-        }
-    }
-}
-
-func (g *Game) CreateExplosion(x, y int) {
-    symbols := []rune{'*', '+', '.', 'o', 'O'}
-    for i := 0; i < 10; i++ {
-        for pi := range g.Particles {
-            if g.Particles[pi].Life == 0 {
-                g.Particles[pi].Position = Vector2{x, y}
-                g.Particles[pi].Velocity = Vector2{rand.Intn(5) - 2, rand.Intn(5) - 2}
-                g.Particles[pi].Life = rand.Intn(20) + 10
-                g.Particles[pi].Symbol = symbols[rand.Intn(len(symbols))]
-                break
-            }
+    if allDead {
+        g.Enemies = make([]Enemy, 0)
+        for i := 0; i < 5; i++ {
+            g.Enemies = append(g.Enemies, NewEnemy(rand.Intn(screenWidth), rand.Intn(screenHeight)))
         }
     }
 }
 
 func (g *Game) Render() {
-    screen := make([][]rune, screenHeight)
-    for i := range screen {
-        screen[i] = make([]rune, screenWidth)
-        for j := range screen[i] {
-            screen[i][j] = ' '
-        }
-    }
-    for _, star := range g.Stars {
-        if star.Position.Y >= 0 && star.Position.Y < screenHeight &&
-            star.Position.X >= 0 && star.Position.X < screenWidth {
-            brightnessChar := '.'
-            if star.Brightness == 2 {
-                brightnessChar = '*'
-            }
-            screen[star.Position.Y][star.Position.X] = brightnessChar
-        }
-    }
-    for _, particle := range g.Particles {
-        if particle.Life > 0 && particle.Position.Y >= 0 && particle.Position.Y < screenHeight &&
-            particle.Position.X >= 0 && particle.Position.X < screenWidth {
-            screen[particle.Position.Y][particle.Position.X] = particle.Symbol
-        }
-    }
-    for _, bullet := range g.Bullets {
-        if bullet.Active && bullet.Position.Y >= 0 && bullet.Position.Y < screenHeight &&
-            bullet.Position.X >= 0 && bullet.Position.X < screenWidth {
-            screen[bullet.Position.Y][bullet.Position.X] = bullet.Symbol
-        }
-    }
+    g.Screen.Clear()
+    // Draw border
+    g.Screen.DrawRect(0, 0, screenWidth-1, screenHeight-1, '#', "37")
+    // Draw player
+    g.Screen.DrawPixel(g.Player.X, g.Player.Y, g.Player.Char, "32")
+    // Draw enemies
     for _, enemy := range g.Enemies {
-        if enemy.Active && enemy.Position.Y >= 0 && enemy.Position.Y < screenHeight &&
-            enemy.Position.X >= 0 && enemy.Position.X < screenWidth {
-            screen[enemy.Position.Y][enemy.Position.X] = enemy.Symbol
+        if enemy.Alive {
+            g.Screen.DrawPixel(enemy.X, enemy.Y, enemy.Char, "31")
         }
     }
-    if g.Player.Position.Y >= 0 && g.Player.Position.Y < screenHeight &&
-        g.Player.Position.X >= 0 && g.Player.Position.X < screenWidth {
-        screen[g.Player.Position.Y][g.Player.Position.X] = g.Player.Symbol
-    }
-    fmt.Print("\033[H\033[2J")
-    for y := 0; y < screenHeight; y++ {
-        line := ""
-        for x := 0; x < screenWidth; x++ {
-            line += string(screen[y][x])
+    // Draw projectiles
+    for _, proj := range g.Projectiles {
+        if proj.Active {
+            g.Screen.DrawPixel(proj.X, proj.Y, proj.Char, "33")
         }
-        fmt.Println(line)
     }
-    fmt.Printf("Health: %d | Score: %d | Level: %d\n", g.Player.Health, g.Player.Score, g.Level)
-    fmt.Println("Controls: A-left, D-right, W-up, S-down, Space-shoot, Q-quit")
-    if g.GameOver {
-        fmt.Println("GAME OVER! Press Enter to exit.")
-    }
+    // Draw score
+    scoreText := fmt.Sprintf("Score: %d", g.Score)
+    g.Screen.DrawText(2, 1, scoreText, "36")
+    // Draw instructions
+    instructions := "WASD: Move, Space: Shoot, Q: Quit"
+    g.Screen.DrawText(2, screenHeight-2, instructions, "35")
+    g.Screen.Render()
 }
 
-func main() {
-    game := Game{}
-    game.Init()
-    reader := bufio.NewReader(os.Stdin)
-    fmt.Print("\033[?25l")
-    defer fmt.Print("\033[?25h")
-    for !game.GameOver {
-        game.Render()
-        game.Update()
-        time.Sleep(time.Second / gameFPS)
-        if game.GameOver {
-            break
-        }
-        fmt.Print("Input: ")
-        input, _ := reader.ReadString('\n')
-        game.Input = strings.TrimSpace(input)
+// Utility functions
+func abs(x int) int {
+    if x < 0 {
+        return -x
     }
-    game.Render()
-    fmt.Println("Final Score:", game.Player.Score)
-    fmt.Println("Press Enter to exit...")
-    reader.ReadString('\n')
+    return x
+}
+
+// Main game loop
+func main() {
+    // Set terminal to raw mode for immediate input (simplified for cross-platform)
+    reader := bufio.NewReader(os.Stdin)
+    fmt.Print("\033[?25l") // Hide cursor
+    defer fmt.Print("\033[?25h") // Show cursor on exit
+
+    game := NewGame()
+
+    // Game introduction
+    introScreen := NewScreen()
+    introScreen.DrawText(20, 5, "ASCII Art Game", "34")
+    introScreen.DrawText(15, 10, "Control a character (@) with WASD keys", "37")
+    introScreen.DrawText(15, 12, "Shoot enemies (E) with SPACE bar", "37")
+    introScreen.DrawText(15, 14, "Avoid collisions with enemies", "37")
+    introScreen.DrawText(15, 16, "Press any key to start...", "32")
+    introScreen.Render()
+    reader.ReadRune() // Wait for key press
+
+    // Main loop
+    for game.Running {
+        game.Render()
+        // Non-blocking input (simplified)
+        fmt.Print("\033[?25l") // Ensure cursor hidden
+        input, _ := reader.ReadString('\n')
+        input = strings.TrimSpace(input)
+        if len(input) > 0 {
+            game.HandleInput(string(input[0]))
+        }
+        game.Update()
+        time.Sleep(50 * time.Millisecond) // Frame rate control
+    }
+
+    // Game over screen
+    gameOverScreen := NewScreen()
+    gameOverScreen.DrawText(25, 10, "Game Over!", "31")
+    scoreText := fmt.Sprintf("Final Score: %d", game.Score)
+    gameOverScreen.DrawText(25, 12, scoreText, "33")
+    gameOverScreen.DrawText(20, 15, "Press any key to exit...", "37")
+    gameOverScreen.Render()
+    reader.ReadRune() // Wait for key press
 }
