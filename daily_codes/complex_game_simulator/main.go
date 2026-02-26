@@ -1,427 +1,415 @@
 package main
 
 import (
-	"fmt"
-	"math/rand"
-	"time"
-	"strconv"
-	"strings"
-	"os"
-	"bufio"
-	"encoding/json"
-	"io/ioutil"
-	"sync"
-	"runtime"
-	"sort"
-	"errors"
+    "bufio"
+    "encoding/json"
+    "fmt"
+    "math/rand"
+    "os"
+    "strconv"
+    "strings"
+    "sync"
+    "time"
 )
 
 type Player struct {
-	ID          int
-	Name        string
-	Health      int
-	MaxHealth   int
-	Strength    int
-	Agility     int
-	Intelligence int
-	Level       int
-	Experience  int
-	Gold        int
-	Inventory   []Item
-	Equipped    map[string]Item
-	Skills      []Skill
+    ID        int
+    Name      string
+    Health    int
+    MaxHealth int
+    Attack    int
+    Defense   int
+    Level     int
+    Experience int
+    Inventory []Item
+    Gold      int
+    Position  Point
 }
 
 type Item struct {
-	ID          int
-	Name        string
-	Type        string // weapon, armor, potion, etc.
-	Value       int
-	Strength    int
-	Agility     int
-	Intelligence int
-	HealthBonus int
-	Description string
+    ID          int
+    Name        string
+    Description string
+    Type        string // "weapon", "armor", "potion", "key"
+    Value       int
+    Durability  int
 }
 
-type Skill struct {
-	ID          int
-	Name        string
-	Type        string // attack, heal, buff, etc.
-	Power       int
-	ManaCost    int
-	Cooldown    int
-	Description string
+type Monster struct {
+    ID        int
+    Name      string
+    Health    int
+    Attack    int
+    Defense   int
+    Experience int
+    Drops     []Item
 }
 
-type Enemy struct {
-	ID          int
-	Name        string
-	Health      int
-	MaxHealth   int
-	Strength    int
-	Agility     int
-	Intelligence int
-	Experience  int
-	GoldDrop    int
-	LootTable   []Item
-	Skills      []Skill
+type Point struct {
+    X int
+    Y int
+}
+
+type GameMap struct {
+    Width   int
+    Height  int
+    Tiles   [][]Tile
+    Monsters []Monster
+    Chests  []Chest
+}
+
+type Tile struct {
+    Type      string // "grass", "water", "mountain", "forest"
+    Passable  bool
+    Symbol    string
+}
+
+type Chest struct {
+    Position Point
+    Locked   bool
+    Items    []Item
 }
 
 type GameState struct {
-	Players     []Player
-	Enemies     []Enemy
-	CurrentTurn int
-	Round       int
-	GameOver    bool
-	Winner      string
-	Log         []string
+    Player    Player
+    Map       GameMap
+    Turn      int
+    GameOver  bool
+    Messages  []string
+    mu        sync.Mutex
 }
 
-var (
-	gameState GameState
-	mutex     sync.Mutex
-	logger    []string
-)
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-	initializeGame()
+func NewPlayer(id int, name string) Player {
+    return Player{
+        ID:        id,
+        Name:      name,
+        Health:    100,
+        MaxHealth: 100,
+        Attack:    10,
+        Defense:   5,
+        Level:     1,
+        Experience: 0,
+        Inventory: []Item{
+            {ID: 1, Name: "Wooden Sword", Description: "A basic sword", Type: "weapon", Value: 5, Durability: 20},
+            {ID: 2, Name: "Leather Armor", Description: "Light armor", Type: "armor", Value: 3, Durability: 30},
+            {ID: 3, Name: "Health Potion", Description: "Restores 50 health", Type: "potion", Value: 20, Durability: 1},
+        },
+        Gold:     50,
+        Position: Point{X: 0, Y: 0},
+    }
 }
 
-func initializeGame() {
-	// Initialize players
-	player1 := Player{
-		ID:          1,
-		Name:        "Hero",
-		Health:      100,
-		MaxHealth:   100,
-		Strength:    10,
-		Agility:     8,
-		Intelligence: 6,
-		Level:       1,
-		Experience:  0,
-		Gold:        50,
-		Inventory:   []Item{},
-		Equipped:    make(map[string]Item),
-		Skills:      []Skill{},
-	}
-	player2 := Player{
-		ID:          2,
-		Name:        "Mage",
-		Health:      80,
-		MaxHealth:   80,
-		Strength:    4,
-		Agility:     6,
-		Intelligence: 12,
-		Level:       1,
-		Experience:  0,
-		Gold:        30,
-		Inventory:   []Item{},
-		Equipped:    make(map[string]Item),
-		Skills:      []Skill{},
-	}
-	gameState.Players = []Player{player1, player2}
-
-	// Initialize enemies
-	enemy1 := Enemy{
-		ID:          1,
-		Name:        "Goblin",
-		Health:      50,
-		MaxHealth:   50,
-		Strength:    6,
-		Agility:     5,
-		Intelligence: 2,
-		Experience:  20,
-		GoldDrop:    10,
-		LootTable:   []Item{},
-		Skills:      []Skill{},
-	}
-	enemy2 := Enemy{
-		ID:          2,
-		Name:        "Orc",
-		Health:      120,
-		MaxHealth:   120,
-		Strength:    12,
-		Agility:     3,
-		Intelligence: 4,
-		Experience:  50,
-		GoldDrop:    25,
-		LootTable:   []Item{},
-		Skills:      []Skill{},
-	}
-	gameState.Enemies = []Enemy{enemy1, enemy2}
-
-	// Initialize items
-	items := []Item{
-		{ID: 1, Name: "Iron Sword", Type: "weapon", Value: 20, Strength: 5, Description: "A basic sword."},
-		{ID: 2, Name: "Leather Armor", Type: "armor", Value: 15, Agility: 3, Description: "Light armor."},
-		{ID: 3, Name: "Health Potion", Type: "potion", Value: 10, HealthBonus: 30, Description: "Restores health."},
-		{ID: 4, Name: "Magic Staff", Type: "weapon", Value: 30, Intelligence: 8, Description: "Enhances magic."},
-	}
-	// Add items to players' inventories
-	gameState.Players[0].Inventory = append(gameState.Players[0].Inventory, items[0], items[1])
-	gameState.Players[1].Inventory = append(gameState.Players[1].Inventory, items[3])
-
-	// Initialize skills
-	skills := []Skill{
-		{ID: 1, Name: "Slash", Type: "attack", Power: 15, ManaCost: 0, Cooldown: 0, Description: "Basic attack."},
-		{ID: 2, Name: "Fireball", Type: "attack", Power: 25, ManaCost: 10, Cooldown: 2, Description: "Magical fire attack."},
-		{ID: 3, Name: "Heal", Type: "heal", Power: 20, ManaCost: 15, Cooldown: 3, Description: "Restores health."},
-	}
-	gameState.Players[0].Skills = append(gameState.Players[0].Skills, skills[0])
-	gameState.Players[1].Skills = append(gameState.Players[1].Skills, skills[1], skills[2])
-
-	gameState.CurrentTurn = 0
-	gameState.Round = 1
-	gameState.GameOver = false
-	gameState.Winner = ""
-	gameState.Log = []string{"Game initialized with 2 players and 2 enemies."}
+func NewMonster(id int, name string, health, attack, defense, exp int) Monster {
+    drops := []Item{}
+    if rand.Intn(100) < 30 {
+        drops = append(drops, Item{ID: 4, Name: "Monster Claw", Description: "A sharp claw", Type: "key", Value: 10, Durability: 1})
+    }
+    if rand.Intn(100) < 20 {
+        drops = append(drops, Item{ID: 5, Name: "Gold Coin", Description: "Worth 10 gold", Type: "potion", Value: 10, Durability: 1})
+    }
+    return Monster{
+        ID:        id,
+        Name:      name,
+        Health:    health,
+        Attack:    attack,
+        Defense:   defense,
+        Experience: exp,
+        Drops:     drops,
+    }
 }
 
-func (p *Player) Attack(target *Enemy, skill Skill) {
-	damage := skill.Power + p.Strength/2
-	if skill.Type == "attack" {
-		damage += p.Intelligence / 4
-	}
-	target.Health -= damage
-	logEntry := fmt.Sprintf("%s uses %s on %s for %d damage.", p.Name, skill.Name, target.Name, damage)
-	gameState.Log = append(gameState.Log, logEntry)
-	if target.Health <= 0 {
-		target.Health = 0
-		logEntry = fmt.Sprintf("%s has been defeated!", target.Name)
-		gameState.Log = append(gameState.Log, logEntry)
-		p.GainExperience(target.Experience)
-		p.Gold += target.GoldDrop
-	}
+func NewGameMap(width, height int) GameMap {
+    tiles := make([][]Tile, height)
+    for y := 0; y < height; y++ {
+        tiles[y] = make([]Tile, width)
+        for x := 0; x < width; x++ {
+            tileType := "grass"
+            passable := true
+            symbol := "."
+            r := rand.Intn(100)
+            if r < 10 {
+                tileType = "water"
+                passable = false
+                symbol = "~"
+            } else if r < 20 {
+                tileType = "mountain"
+                passable = false
+                symbol = "^"
+            } else if r < 40 {
+                tileType = "forest"
+                symbol = "*"
+            }
+            tiles[y][x] = Tile{Type: tileType, Passable: passable, Symbol: symbol}
+        }
+    }
+    monsters := []Monster{}
+    for i := 0; i < 10; i++ {
+        x := rand.Intn(width)
+        y := rand.Intn(height)
+        if tiles[y][x].Passable {
+            monster := NewMonster(i+1, fmt.Sprintf("Goblin %d", i+1), 30, 8, 2, 20)
+            monsters = append(monsters, monster)
+        }
+    }
+    chests := []Chest{}
+    for i := 0; i < 5; i++ {
+        x := rand.Intn(width)
+        y := rand.Intn(height)
+        if tiles[y][x].Passable {
+            items := []Item{
+                {ID: 6, Name: "Iron Sword", Description: "A stronger sword", Type: "weapon", Value: 15, Durability: 40},
+                {ID: 7, Name: "Steel Armor", Description: "Heavy armor", Type: "armor", Value: 10, Durability: 50},
+            }
+            chests = append(chests, Chest{Position: Point{X: x, Y: y}, Locked: rand.Intn(100) < 50, Items: items})
+        }
+    }
+    return GameMap{Width: width, Height: height, Tiles: tiles, Monsters: monsters, Chests: chests}
 }
 
-func (e *Enemy) Attack(target *Player, skill Skill) {
-	damage := skill.Power + e.Strength/2
-	target.Health -= damage
-	logEntry := fmt.Sprintf("%s uses %s on %s for %d damage.", e.Name, skill.Name, target.Name, damage)
-	gameState.Log = append(gameState.Log, logEntry)
-	if target.Health <= 0 {
-		target.Health = 0
-		logEntry = fmt.Sprintf("%s has been defeated!", target.Name)
-		gameState.Log = append(gameState.Log, logEntry)
-	}
+func (p *Player) Move(dx, dy int, m *GameMap) bool {
+    newX := p.Position.X + dx
+    newY := p.Position.Y + dy
+    if newX < 0 || newX >= m.Width || newY < 0 || newY >= m.Height {
+        return false
+    }
+    if !m.Tiles[newY][newX].Passable {
+        return false
+    }
+    p.Position.X = newX
+    p.Position.Y = newY
+    return true
 }
 
-func (p *Player) GainExperience(exp int) {
-	p.Experience += exp
-	for p.Experience >= p.Level*100 {
-		p.Level++
-		p.MaxHealth += 20
-		p.Health = p.MaxHealth
-		p.Strength += 2
-		p.Agility += 1
-		p.Intelligence += 1
-		logEntry := fmt.Sprintf("%s leveled up to level %d!", p.Name, p.Level)
-		gameState.Log = append(gameState.Log, logEntry)
-	}
+func (p *Player) AttackMonster(m *Monster) (bool, int) {
+    damage := p.Attack - m.Defense
+    if damage < 1 {
+        damage = 1
+    }
+    m.Health -= damage
+    if m.Health <= 0 {
+        p.Experience += m.Experience
+        p.Gold += rand.Intn(20) + 5
+        return true, damage
+    }
+    return false, damage
 }
 
-func (p *Player) UseItem(item Item) {
-	switch item.Type {
-	case "potion":
-		p.Health += item.HealthBonus
-		if p.Health > p.MaxHealth {
-			p.Health = p.MaxHealth
-		}
-		logEntry := fmt.Sprintf("%s uses %s and restores %d health.", p.Name, item.Name, item.HealthBonus)
-		gameState.Log = append(gameState.Log, logEntry)
-	case "weapon", "armor":
-		p.Equipped[item.Type] = item
-		logEntry := fmt.Sprintf("%s equips %s.", p.Name, item.Name)
-		gameState.Log = append(gameState.Log, logEntry)
-	}
-	// Remove item from inventory
-	for i, invItem := range p.Inventory {
-		if invItem.ID == item.ID {
-			p.Inventory = append(p.Inventory[:i], p.Inventory[i+1:]...)
-			break
-		}
-	}
+func (m *Monster) AttackPlayer(p *Player) (bool, int) {
+    damage := m.Attack - p.Defense
+    if damage < 1 {
+        damage = 1
+    }
+    p.Health -= damage
+    if p.Health <= 0 {
+        return true, damage
+    }
+    return false, damage
 }
 
-func simulateCombat() {
-	for !gameState.GameOver {
-		mutex.Lock()
-		logEntry := fmt.Sprintf("--- Round %d ---", gameState.Round)
-		gameState.Log = append(gameState.Log, logEntry)
-
-		// Player turns
-		for i := range gameState.Players {
-			if gameState.Players[i].Health > 0 {
-				player := &gameState.Players[i]
-				// Simple AI: attack random enemy with first skill
-				if len(gameState.Enemies) > 0 {
-					enemyIndex := rand.Intn(len(gameState.Enemies))
-					enemy := &gameState.Enemies[enemyIndex]
-					if len(player.Skills) > 0 {
-						skill := player.Skills[0]
-						player.Attack(enemy, skill)
-					}
-				}
-			}
-		}
-
-		// Remove defeated enemies
-		aliveEnemies := []Enemy{}
-		for _, enemy := range gameState.Enemies {
-			if enemy.Health > 0 {
-				aliveEnemies = append(aliveEnemies, enemy)
-			}
-		}
-		gameState.Enemies = aliveEnemies
-
-		// Check if all enemies are defeated
-		if len(gameState.Enemies) == 0 {
-			gameState.GameOver = true
-			gameState.Winner = "Players"
-			logEntry = "All enemies defeated! Players win!"
-			gameState.Log = append(gameState.Log, logEntry)
-			mutex.Unlock()
-			break
-		}
-
-		// Enemy turns
-		for i := range gameState.Enemies {
-			enemy := &gameState.Enemies[i]
-			// Simple AI: attack random player with first skill
-			if len(gameState.Players) > 0 {
-				playerIndex := rand.Intn(len(gameState.Players))
-				player := &gameState.Players[playerIndex]
-				if len(enemy.Skills) > 0 {
-					skill := enemy.Skills[0]
-					enemy.Attack(player, skill)
-				}
-			}
-		}
-
-		// Remove defeated players
-		alivePlayers := []Player{}
-		for _, player := range gameState.Players {
-			if player.Health > 0 {
-				alivePlayers = append(alivePlayers, player)
-			}
-		}
-		gameState.Players = alivePlayers
-
-		// Check if all players are defeated
-		if len(gameState.Players) == 0 {
-			gameState.GameOver = true
-			gameState.Winner = "Enemies"
-			logEntry = "All players defeated! Enemies win!"
-			gameState.Log = append(gameState.Log, logEntry)
-			mutex.Unlock()
-			break
-		}
-
-		gameState.Round++
-		mutex.Unlock()
-		time.Sleep(500 * time.Millisecond) // Simulate turn delay
-	}
+func (p *Player) LevelUp() {
+    if p.Experience >= p.Level*100 {
+        p.Level++
+        p.MaxHealth += 20
+        p.Health = p.MaxHealth
+        p.Attack += 5
+        p.Defense += 3
+        p.Experience = 0
+    }
 }
 
-func saveGameState(filename string) error {
-	mutex.Lock()
-	defer mutex.Unlock()
-	data, err := json.MarshalIndent(gameState, "", "  ")
-	if err != nil {
-		return err
-	}
-	return ioutil.WriteFile(filename, data, 0644)
+func (p *Player) UseItem(itemIndex int) bool {
+    if itemIndex < 0 || itemIndex >= len(p.Inventory) {
+        return false
+    }
+    item := &p.Inventory[itemIndex]
+    if item.Type == "potion" {
+        p.Health += 50
+        if p.Health > p.MaxHealth {
+            p.Health = p.MaxHealth
+        }
+        item.Durability--
+        if item.Durability <= 0 {
+            p.Inventory = append(p.Inventory[:itemIndex], p.Inventory[itemIndex+1:]...)
+        }
+        return true
+    }
+    return false
 }
 
-func loadGameState(filename string) error {
-	mutex.Lock()
-	defer mutex.Unlock()
-	data, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(data, &gameState)
+func (gs *GameState) AddMessage(msg string) {
+    gs.mu.Lock()
+    defer gs.mu.Unlock()
+    gs.Messages = append(gs.Messages, msg)
+    if len(gs.Messages) > 10 {
+        gs.Messages = gs.Messages[1:]
+    }
 }
 
-func displayStatus() {
-	mutex.Lock()
-	defer mutex.Unlock()
-	fmt.Println("=== Game Status ===")
-	fmt.Println("Players:")
-	for _, player := range gameState.Players {
-		fmt.Printf("  %s: Health %d/%d, Level %d, Gold %d\n", player.Name, player.Health, player.MaxHealth, player.Level, player.Gold)
-	}
-	fmt.Println("Enemies:")
-	for _, enemy := range gameState.Enemies {
-		fmt.Printf("  %s: Health %d/%d\n", enemy.Name, enemy.Health, enemy.MaxHealth)
-	}
-	fmt.Printf("Round: %d\n", gameState.Round)
-	if gameState.GameOver {
-		fmt.Printf("Game Over! Winner: %s\n", gameState.Winner)
-	}
+func (gs *GameState) Display() {
+    fmt.Println("=== Complex Game Simulator ===")
+    fmt.Printf("Turn: %d | Player: %s (Level %d) | Health: %d/%d | Gold: %d | Exp: %d\n",
+        gs.Turn, gs.Player.Name, gs.Player.Level, gs.Player.Health, gs.Player.MaxHealth, gs.Player.Gold, gs.Player.Experience)
+    fmt.Println("Position:", gs.Player.Position)
+    fmt.Println("Inventory:")
+    for i, item := range gs.Player.Inventory {
+        fmt.Printf("  %d: %s (%s) - %s\n", i, item.Name, item.Type, item.Description)
+    }
+    fmt.Println("Map (P=Player, M=Monster, C=Chest):")
+    for y := 0; y < gs.Map.Height; y++ {
+        for x := 0; x < gs.Map.Width; x++ {
+            symbol := gs.Map.Tiles[y][x].Symbol
+            if gs.Player.Position.X == x && gs.Player.Position.Y == y {
+                symbol = "P"
+            } else {
+                for _, monster := range gs.Map.Monsters {
+                    // Simplified: monsters not displayed on map for brevity
+                }
+                for _, chest := range gs.Map.Chests {
+                    if chest.Position.X == x && chest.Position.Y == y {
+                        symbol = "C"
+                    }
+                }
+            }
+            fmt.Print(symbol)
+        }
+        fmt.Println()
+    }
+    fmt.Println("Recent Messages:")
+    for _, msg := range gs.Messages {
+        fmt.Println("  ", msg)
+    }
+    fmt.Println("Commands: move [n/s/e/w], attack, use [item_index], save, load, quit")
 }
 
-func displayLog() {
-	mutex.Lock()
-	defer mutex.Unlock()
-	fmt.Println("=== Game Log ===")
-	for _, entry := range gameState.Log {
-		fmt.Println(entry)
-	}
+func (gs *GameState) Save(filename string) error {
+    data, err := json.Marshal(gs)
+    if err != nil {
+        return err
+    }
+    return os.WriteFile(filename, data, 0644)
+}
+
+func (gs *GameState) Load(filename string) error {
+    data, err := os.ReadFile(filename)
+    if err != nil {
+        return err
+    }
+    return json.Unmarshal(data, gs)
+}
+
+func (gs *GameState) ProcessCommand(cmd string) {
+    parts := strings.Fields(cmd)
+    if len(parts) == 0 {
+        gs.AddMessage("Invalid command")
+        return
+    }
+    switch parts[0] {
+    case "move":
+        if len(parts) < 2 {
+            gs.AddMessage("Usage: move [n/s/e/w]")
+            return
+        }
+        dx, dy := 0, 0
+        switch parts[1] {
+        case "n":
+            dy = -1
+        case "s":
+            dy = 1
+        case "e":
+            dx = 1
+        case "w":
+            dx = -1
+        default:
+            gs.AddMessage("Invalid direction")
+            return
+        }
+        if gs.Player.Move(dx, dy, &gs.Map) {
+            gs.AddMessage(fmt.Sprintf("Moved to (%d, %d)", gs.Player.Position.X, gs.Player.Position.Y))
+            // Check for encounters
+            for i, monster := range gs.Map.Monsters {
+                // Simplified: combat not triggered by movement in this version
+            }
+            for i, chest := range gs.Map.Chests {
+                if chest.Position.X == gs.Player.Position.X && chest.Position.Y == gs.Player.Position.Y {
+                    gs.AddMessage("You found a chest!")
+                    if chest.Locked {
+                        gs.AddMessage("Chest is locked. Need a key.")
+                    } else {
+                        gs.AddMessage("Chest opened. Items added to inventory.")
+                        gs.Player.Inventory = append(gs.Player.Inventory, chest.Items...)
+                        gs.Map.Chests = append(gs.Map.Chests[:i], gs.Map.Chests[i+1:]...)
+                    }
+                }
+            }
+        } else {
+            gs.AddMessage("Cannot move there")
+        }
+    case "attack":
+        // Simplified: attack a monster at current position
+        gs.AddMessage("No monster here to attack")
+    case "use":
+        if len(parts) < 2 {
+            gs.AddMessage("Usage: use [item_index]")
+            return
+        }
+        index, err := strconv.Atoi(parts[1])
+        if err != nil {
+            gs.AddMessage("Invalid item index")
+            return
+        }
+        if gs.Player.UseItem(index) {
+            gs.AddMessage("Item used")
+        } else {
+            gs.AddMessage("Cannot use that item")
+        }
+    case "save":
+        err := gs.Save("savegame.json")
+        if err != nil {
+            gs.AddMessage(fmt.Sprintf("Save failed: %v", err))
+        } else {
+            gs.AddMessage("Game saved")
+        }
+    case "load":
+        err := gs.Load("savegame.json")
+        if err != nil {
+            gs.AddMessage(fmt.Sprintf("Load failed: %v", err))
+        } else {
+            gs.AddMessage("Game loaded")
+        }
+    case "quit":
+        gs.GameOver = true
+        gs.AddMessage("Thanks for playing!")
+    default:
+        gs.AddMessage("Unknown command")
+    }
+    gs.Turn++
+    gs.Player.LevelUp()
 }
 
 func main() {
-	fmt.Println("Welcome to Complex Game Simulator!")
-	fmt.Println("Commands: start, status, log, save <filename>, load <filename>, exit")
-
-	reader := bufio.NewReader(os.Stdin)
-	go simulateCombat() // Start combat simulation in background
-
-	for {
-		fmt.Print("> ")
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(input)
-		parts := strings.Split(input, " ")
-		command := parts[0]
-
-		switch command {
-		case "start":
-			initializeGame()
-			go simulateCombat()
-			fmt.Println("Game restarted.")
-		case "status":
-			displayStatus()
-		case "log":
-			displayLog()
-		case "save":
-			if len(parts) < 2 {
-				fmt.Println("Usage: save <filename>")
-				continue
-			}
-			filename := parts[1]
-			if err := saveGameState(filename); err != nil {
-				fmt.Printf("Error saving game: %v\n", err)
-			} else {
-				fmt.Println("Game saved successfully.")
-			}
-		case "load":
-			if len(parts) < 2 {
-				fmt.Println("Usage: load <filename>")
-				continue
-			}
-			filename := parts[1]
-			if err := loadGameState(filename); err != nil {
-				fmt.Printf("Error loading game: %v\n", err)
-			} else {
-				fmt.Println("Game loaded successfully.")
-			}
-		case "exit":
-			fmt.Println("Exiting game.")
-			return
-		default:
-			fmt.Println("Unknown command. Try: start, status, log, save, load, exit")
-		}
-	}
+    rand.Seed(time.Now().UnixNano())
+    fmt.Println("Welcome to Complex Game Simulator!")
+    fmt.Print("Enter your name: ")
+    reader := bufio.NewReader(os.Stdin)
+    name, _ := reader.ReadString('\n')
+    name = strings.TrimSpace(name)
+    if name == "" {
+        name = "Hero"
+    }
+    player := NewPlayer(1, name)
+    gameMap := NewGameMap(20, 10)
+    gameState := GameState{
+        Player:   player,
+        Map:      gameMap,
+        Turn:     1,
+        GameOver: false,
+        Messages: []string{"Game started!"},
+    }
+    for !gameState.GameOver {
+        gameState.Display()
+        fmt.Print("> ")
+        cmd, _ := reader.ReadString('\n')
+        cmd = strings.TrimSpace(cmd)
+        gameState.ProcessCommand(cmd)
+    }
 }
